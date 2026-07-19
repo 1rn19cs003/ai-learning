@@ -51,7 +51,7 @@
   #sidebar .sb-sep { border-top: 1px solid var(--border); margin: 12px 0; }
   body { margin-left: calc((100% - 250px - 900px)/2 + 250px); margin-right: auto; }
   @media (max-width: 1250px) { body { margin-left: 270px; margin-right: 20px; } }
-  @media (max-width: 900px) { #sidebar { display: none; } body { margin: 0 auto; } }
+  @media (max-width: 900px) { #sidebar { position: static; width: 100%; height: auto; display: flex; flex-wrap: wrap; gap: 8px; border-right: none; border-bottom: 1px solid var(--border); padding: 12px; position: sticky; top: 0; z-index: 100; max-height: 50vh; } #sidebar .sb-part, #sidebar .sb-sep { display: none; } body { margin: 0 auto; padding-top: 12px; } }
   @media print { #sidebar { display: none; } body { margin: 0 auto; } }
 </style>
 </head>
@@ -138,7 +138,7 @@
 
 <h2 id="part1">Part I — Foundations: how LLMs actually work <a href="../notes/Handwritten_Notes.html#part1" style="font-size:13px; font-family:Arial,sans-serif; vertical-align:middle;">✎ notes</a></h2>
 
-<div class="milestone">
+<div class="milestone" id="m0">
 <span class="m-num">MILESTONE 0 · ~1 week</span>
 <h3>Math prerequisites (only what you actually need)</h3>
 <h4>What you will learn</h4>
@@ -157,7 +157,7 @@
 <div class="expected">Expected: ~60 lines of TS, and you can answer "why divide by the norm?" without looking it up.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m1">
 <span class="m-num">MILESTONE 1 · ~1.5 weeks</span>
 <h3>Neural networks &amp; backpropagation from scratch</h3>
 <h4>What you will learn</h4>
@@ -176,7 +176,7 @@
 <div class="expected">Expected: your TS autograd trains XOR to ~0 loss, and you can explain what a single <code>.backward()</code> call does step by step.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m2">
 <span class="m-num">MILESTONE 2 · ~1 week</span>
 <h3>Tokenization &amp; embeddings — how text becomes numbers</h3>
 <h4>What you will learn</h4>
@@ -197,7 +197,7 @@
 <div class="expected">Expected: your BPE produces sensible subwords, and you can explain why "internationalization" is ~4 tokens but "the" is 1.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m3">
 <span class="m-num">MILESTONE 3 · ~2 weeks (the core)</span>
 <h3>The Transformer &amp; attention, in full depth</h3>
 <h4>What you will learn</h4>
@@ -221,7 +221,7 @@
 <div class="expected">Expected: generated Shakespeare-ish text, and you can whiteboard the attention formula and say what every symbol does.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m4">
 <span class="m-num">MILESTONE 4 · ~1 week</span>
 <h3>How models are trained: pretraining → instruction tuning → alignment</h3>
 <h4>What you will learn</h4>
@@ -247,7 +247,7 @@
 
 <h2 id="part2">Part II — Using LLMs &amp; the geometry of meaning <a href="../notes/Handwritten_Notes.html#part2" style="font-size:13px; font-family:Arial,sans-serif; vertical-align:middle;">✎ notes</a></h2>
 
-<div class="milestone">
+<div class="milestone" id="m5">
 <span class="m-num">MILESTONE 5 · ~1 week</span>
 <h3>Working with LLMs as an engineer <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -269,7 +269,7 @@
 <div class="expected">Expected: you can predict, before running, how changing temperature from 0 to 1.2 alters output for a factual vs. creative prompt.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m6">
 <span class="m-num">MILESTONE 6 · ~1 week</span>
 <h3>Embeddings at scale &amp; approximate nearest-neighbor search <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -334,7 +334,7 @@
 </svg>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m7">
 <span class="m-num">MILESTONE 7 · ~1 week</span>
 <h3>RAG fundamentals — and why naive RAG fails <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -355,7 +355,7 @@
 <div class="expected">Expected: a working pipeline AND a documented failure taxonomy. The failures are the real deliverable.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m8">
 <span class="m-num">MILESTONE 8 · ~2 weeks</span>
 <h3>Advanced RAG: hybrid, transformation, re-ranking, Graph RAG <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -383,7 +383,7 @@
 
 <h2 id="part4">Part IV — Evaluation, agents, production <a href="../notes/Handwritten_Notes.html#part4" style="font-size:13px; font-family:Arial,sans-serif; vertical-align:middle;">✎ notes</a></h2>
 
-<div class="milestone">
+<div class="milestone" id="m9">
 <span class="m-num">MILESTONE 9 · ~1 week</span>
 <h3>Evaluation frameworks — Ragas, TruLens, promptfoo</h3>
 <h4>What you will learn</h4>
@@ -404,7 +404,7 @@
 <div class="expected">Expected: a reproducible <code>npm run eval</code> that fails if faithfulness drops below a threshold — evaluation as CI, not as a one-off notebook.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m1">
 <span class="m-num">MILESTONE 10 · ~1.5 weeks</span>
 <h3>Agents, routing &amp; multi-agent orchestration <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -425,7 +425,7 @@
 <div class="expected">Expected: visible reasoning traces, a bounded loop (max N steps), and an informed opinion on frameworks vs. hand-rolled.</div></div>
 </div>
 
-<div class="milestone">
+<div class="milestone" id="m1">
 <span class="m-num">MILESTONE 11 · ~1 week</span>
 <h3>Production engineering <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
