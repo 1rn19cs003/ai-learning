@@ -47,10 +47,16 @@
 </head>
 <body>
 
+<nav style="font-family: 'Patrick Hand', cursive; font-size: 17px; margin-bottom: 14px;">
+<a href="../../index.html" style="text-decoration:none; color:#b3402a; border:2px solid #b3402a; border-radius:16px; padding:4px 14px;">← all tracks</a>
+&nbsp;
+<a href="../curriculum/LLM_RAG_Curriculum.html" style="text-decoration:none; color:#1c5d99; border:2px solid #1c5d99; border-radius:16px; padding:4px 14px;">📚 full curriculum</a>
+</nav>
+
 <h1>My LLM &amp; RAG notebook ✎</h1>
 <p style="font-family:'Caveat',cursive; font-size:26px; color:#7a2c88;">everything explained like I'm 12 — but complete. one page per big idea.</p>
 
-<div class="part-banner">PART I — how LLMs actually work (M0–M4)</div>
+<div class="part-banner" id="part1">PART I — how LLMs actually work (M0–M4)</div>
 
 <div class="page">
 <h2>Page 1 · The math I actually need (M0)</h2>
@@ -200,7 +206,7 @@
 <div class="remember">Fine-tuning teaches STYLE and BEHAVIOUR. It's bad at adding FACTS. For facts that change (docs, code, news) → RAG. This one sentence saves you months.</div>
 </div>
 
-<div class="part-banner">PART II — using LLMs like an engineer (M5–M6)</div>
+<div class="part-banner" id="part2">PART II — using LLMs like an engineer (M5–M6)</div>
 
 <div class="page">
 <h2>Page 6 · Talking to LLMs properly (M5)</h2>
@@ -246,7 +252,7 @@
 <div class="remember">cosine similarity on NORMALIZED vectors = dot product. Most stacks just normalize once and use dot. Now you know why.</div>
 </div>
 
-<div class="part-banner">PART III — RAG: giving the model an open book (M7–M8)</div>
+<div class="part-banner" id="part3">PART III — RAG: giving the model an open book (M7–M8)</div>
 
 <div class="page">
 <h2>Page 8 · RAG basics (M7)</h2>
@@ -332,7 +338,7 @@
 <div class="remember">order of adding techniques when quality is bad: (1) better chunking → (2) hybrid+RRF → (3) reranker → (4) query rewriting → (5) contextual retrieval → (6) graph/self-correction. Measure after EACH. Never add all at once.</div>
 </div>
 
-<div class="part-banner">PART IV — evals, agents, production (M9–M11)</div>
+<div class="part-banner" id="part4">PART IV — evals, agents, production (M9–M11)</div>
 
 <div class="page">
 <h2>Page 10 · Evaluation — stop trusting vibes (M9)</h2>
@@ -404,10 +410,4 @@
 <ul class="arrow-list">
 <li><b>Incremental re-indexing:</b> on doc/git change, re-embed only changed chunks (hash them).</li>
 <li><b>Monitoring = your eval set on a timer:</b> run the golden set nightly against prod; alert if scores drop (model provider changed something? index corrupted?).</li>
-<li><b>Docker-compose everything</b> so one command boots API + vector DB + UI.</li>
-</ul>
-<div class="remember">the whole course in one breath: numbers-with-meaning (vectors) flow through blame-trained (backprop) attention machines (transformers) that we raise politely (SFT/RLHF), hand an open book (RAG), teach to double-check (evals + critics), give hands carefully (agents + guardrails), and ship cheaply (caching + routing). That's AI engineering. ✎</div>
-</div>
-
-</body>
-</html>
+<li><b>Docker-compose everything</b> so one co

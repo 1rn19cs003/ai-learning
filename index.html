@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Learnings — Abhishek</title>
+<style>
+  :root { --accent: #C15F3C; --dark: #21201C; --grey: #6B6862; --light: #F4F3EE; --border: #D9D6CE; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: #FAF9F5; color: var(--dark); max-width: 1000px; margin: 0 auto; padding: 48px 24px; }
+  h1 { font-size: 36px; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--grey); font-size: 17px; margin-top: 0; margin-bottom: 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 24px 26px; transition: box-shadow .15s, transform .15s; display: flex; flex-direction: column; }
+  .card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); transform: translateY(-2px); }
+  .card h2 { font-size: 22px; margin: 0 0 6px; }
+  .card .desc { color: var(--grey); font-size: 15px; line-height: 1.55; flex: 1; }
+  .badge { display: inline-block; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 1px; background: var(--accent); color: #fff; border-radius: 12px; padding: 3px 12px; margin-bottom: 12px; width: fit-content; }
+  .badge.soon { background: var(--grey); }
+  .links { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .links a { font-family: Arial, sans-serif; font-size: 13px; text-decoration: none; color: var(--accent); border: 1px solid var(--accent); border-radius: 16px; padding: 5px 14px; }
+  .links a:hover { background: var(--accent); color: #fff; }
+  .card.placeholder { border-style: dashed; background: transparent; align-items: center; justify-content: center; min-height: 220px; color: var(--grey); text-align: center; }
+  .card.placeholder .plus { font-size: 40px; color: var(--border); line-height: 1; margin-bottom: 8px; }
+  footer { margin-top: 48px; color: var(--grey); font-size: 13px; font-family: Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>AI <span>Learnings</span></h1>
+<p class="subtitle">My learning tracks — one card per track. Click through to curriculum, notes, and plans.</p>
+
+<div class="grid">
+
+  <div class="card">
+    <span class="badge">TRACK 01 · IN PROGRESS</span>
+    <h2>LLM &amp; RAG</h2>
+    <p class="desc">From how transformers and attention work under the hood, to advanced RAG pipelines (hybrid search, re-ranking, Graph RAG, self-correction), evals, agents, and production. Ends with the <b>RepoSage</b> flagship project — a multi-agent codebase intelligence engine.</p>
+    <div class="links">
+      <a href="Rag/curriculum/LLM_RAG_Curriculum.html">📚 Curriculum</a>
+      <a href="Rag/notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+      <a href="Rag/plan/LLM_RAG_Project_Plan.pdf">🗓 8-week plan</a>
+      <a href="Rag/diagrams/LLM_RAG_Project.drawio">⬡ Diagrams (.drawio)</a>
+    </div>
+  </div>
+
+  <div class="card placeholder">
+    <div>
+      <div class="plus">+</div>
+      Next track goes here<br>
+      <small>(copy the card above, change badge to TRACK 02)</small>
+    </div>
+  </div>
+
+</div>
+
+<footer>Private learning repo · Abhishek</footer>
+
+</body>
+</html>
