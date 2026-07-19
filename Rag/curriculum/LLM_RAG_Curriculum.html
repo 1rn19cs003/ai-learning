@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM &amp; Advanced RAG — Complete Curriculum</title>
+<style>
+  :root {
+    --accent: #C15F3C; --dark: #21201C; --grey: #6B6862;
+    --light: #F4F3EE; --border: #D9D6CE; --code-bg: #F0EEE9;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: var(--dark); max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; line-height: 1.65; font-size: 16px; }
+  h1 { font-size: 34px; color: var(--accent); margin-bottom: 4px; }
+  h2 { font-size: 24px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-top: 56px; }
+  h3 { font-size: 19px; margin-top: 32px; }
+  h4 { font-size: 16px; margin-top: 24px; color: var(--grey); text-transform: uppercase; letter-spacing: 0.5px; }
+  .subtitle { color: var(--grey); font-size: 18px; margin-top: 0; }
+  .milestone { background: var(--light); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 28px 0; }
+  .milestone h3 { margin-top: 0; }
+  .m-num { color: var(--accent); font-weight: bold; font-family: Arial, sans-serif; font-size: 13px; letter-spacing: 1px; }
+  .checkpoint { background: #fff; border: 1px dashed var(--accent); border-radius: 6px; padding: 12px 16px; margin-top: 14px; }
+  .checkpoint::before { content: "CHECKPOINT — prove it before moving on"; display: block; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 1px; color: var(--accent); font-weight: bold; margin-bottom: 6px; }
+  .expected { font-style: italic; color: var(--grey); margin-top: 8px; font-size: 14.5px; }
+  ul { padding-left: 22px; } li { margin-bottom: 6px; }
+  a { color: #1a5fa5; }
+  code { background: var(--code-bg); font-family: Consolas, monospace; font-size: 14px; padding: 1px 5px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--light); font-family: Arial, sans-serif; font-size: 13px; }
+  .diagram { margin: 28px 0; text-align: center; }
+  .diagram svg { max-width: 100%; height: auto; }
+  .toc { background: var(--light); border-radius: 8px; padding: 18px 28px; margin: 24px 0; }
+  .toc a { text-decoration: none; }
+  .note { background: #FDF6EC; border: 1px solid #EFD9B4; border-radius: 6px; padding: 12px 16px; font-size: 14.5px; margin: 16px 0; }
+  .tag { display: inline-block; font-family: Arial, sans-serif; font-size: 11px; background: var(--accent); color: #fff; border-radius: 10px; padding: 2px 10px; margin-left: 8px; vertical-align: middle; }
+  @media print { body { font-size: 13px; } .milestone { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>LLMs from the Ground Up → Advanced RAG</h1>
+<p class="subtitle">An exhaustive, self-paced curriculum with a flagship portfolio project<br>Tailored for a JavaScript/TypeScript engineer (2+ yrs) moving into AI engineering</p>
+
+<div class="note"><b>How to use this document.</b> Work through milestones strictly in order — each checkpoint gates the next milestone. Estimated total: 14–18 weeks at 8–10 hrs/week. Code in TypeScript wherever the ecosystem allows (noted per milestone); Python appears only where it is unavoidable (training internals, some eval tooling). The portfolio project at the end is built incrementally: each milestone ends with a project task, so by the final milestone you have shipped the whole system.</div>
+
+<div class="toc">
+<b>Contents</b><br>
+<a href="#part1">Part I — Foundations: how LLMs actually work (M0–M4)</a><br>
+<a href="#part2">Part II — Using LLMs &amp; the geometry of meaning (M5–M6)</a><br>
+<a href="#part3">Part III — RAG, from naive to state of the art (M7–M8)</a><br>
+<a href="#part4">Part IV — Evaluation, agents, production (M9–M11)</a><br>
+<a href="#project">Flagship Portfolio Project — "RepoSage"</a><br>
+<a href="#appendix">Appendix — paper reading list &amp; weekly cadence</a>
+</div>
+
+<div class="diagram">
+<svg viewBox="0 0 860 210" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#B8B4A8"/></marker></defs>
+  <rect x="10" y="20" width="190" height="70" rx="8" fill="#F4F3EE" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="105" y="45" text-anchor="middle" font-weight="bold">Part I · M0–M4</text>
+  <text x="105" y="63" text-anchor="middle" fill="#6B6862">Math → Transformers</text>
+  <text x="105" y="79" text-anchor="middle" fill="#6B6862">→ Training &amp; alignment</text>
+  <rect x="230" y="20" width="190" height="70" rx="8" fill="#F4F3EE" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="325" y="45" text-anchor="middle" font-weight="bold">Part II · M5–M6</text>
+  <text x="325" y="63" text-anchor="middle" fill="#6B6862">Prompting, sampling,</text>
+  <text x="325" y="79" text-anchor="middle" fill="#6B6862">embeddings, ANN search</text>
+  <rect x="450" y="20" width="190" height="70" rx="8" fill="#F4F3EE" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="545" y="45" text-anchor="middle" font-weight="bold">Part III · M7–M8</text>
+  <text x="545" y="63" text-anchor="middle" fill="#6B6862">Naive RAG → hybrid,</text>
+  <text x="545" y="79" text-anchor="middle" fill="#6B6862">rerank, Graph RAG</text>
+  <rect x="670" y="20" width="180" height="70" rx="8" fill="#F4F3EE" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="760" y="45" text-anchor="middle" font-weight="bold">Part IV · M9–M11</text>
+  <text x="760" y="63" text-anchor="middle" fill="#6B6862">Evals, agents,</text>
+  <text x="760" y="79" text-anchor="middle" fill="#6B6862">production</text>
+  <line x1="200" y1="55" x2="230" y2="55" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="420" y1="55" x2="450" y2="55" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="640" y1="55" x2="670" y2="55" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="230" y="130" width="410" height="55" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="435" y="153" text-anchor="middle" font-weight="bold" fill="#C15F3C">RepoSage — flagship project</text>
+  <text x="435" y="171" text-anchor="middle" fill="#6B6862">built incrementally: one project task per milestone</text>
+  <line x1="105" y1="90" x2="300" y2="130" stroke="#B8B4A8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="325" y1="90" x2="380" y2="130" stroke="#B8B4A8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="545" y1="90" x2="490" y2="130" stroke="#B8B4A8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="760" y1="90" x2="570" y2="130" stroke="#B8B4A8" stroke-width="1" marker-end="url(#ar)"/>
+</svg>
+</div>
+
+<h2 id="part1">Part I — Foundations: how LLMs actually work</h2>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 0 · ~1 week</span>
+<h3>Math prerequisites (only what you actually need)</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Linear algebra: vectors, matrices, matrix multiplication as transformation, dot products as similarity — the single most important intuition for everything that follows.</li>
+<li>Calculus: derivatives, the chain rule, gradients — enough to understand backpropagation, no more.</li>
+<li>Probability: distributions, conditional probability, softmax as a distribution over tokens, cross-entropy loss.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://www.3blue1brown.com/topics/linear-algebra">3Blue1Brown — Essence of Linear Algebra</a> (video series; watch all of it, it's the best visual intuition available)</li>
+<li><a href="https://www.3blue1brown.com/topics/calculus">3Blue1Brown — Essence of Calculus</a> (chapters 1–4 suffice)</li>
+<li><a href="https://mml-book.github.io/">Mathematics for Machine Learning</a> (free book — use as reference, not cover-to-cover)</li>
+</ul>
+<div class="checkpoint">Implement, in plain TypeScript with no libraries: dot product, matrix multiply, softmax, and cosine similarity. Then explain in writing (5 sentences max each) why softmax turns logits into probabilities and why cosine similarity measures semantic closeness.
+<div class="expected">Expected: ~60 lines of TS, and you can answer "why divide by the norm?" without looking it up.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 1 · ~1.5 weeks</span>
+<h3>Neural networks &amp; backpropagation from scratch</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Neurons, weights, biases, activation functions; why depth and nonlinearity matter.</li>
+<li>Backpropagation as recursive chain rule; gradient descent, learning rates, loss landscapes.</li>
+<li>Autograd — how PyTorch/TensorFlow compute gradients automatically.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=VMj-3S1tku0">Karpathy — "The spelled-out intro to neural networks and backpropagation: building micrograd"</a> (the canonical from-scratch lecture)</li>
+<li><a href="https://github.com/karpathy/micrograd">karpathy/micrograd</a> (repo — ~100 lines of autograd)</li>
+<li><a href="https://www.3blue1brown.com/topics/neural-networks">3Blue1Brown — Neural Networks series</a> (visual companion)</li>
+</ul>
+<div class="checkpoint">Port micrograd to TypeScript. Train a tiny MLP on XOR and on a 2D spiral dataset; plot the decision boundary (Canvas or a simple HTML page — you're a JS dev, use it).
+<div class="expected">Expected: your TS autograd trains XOR to ~0 loss, and you can explain what a single <code>.backward()</code> call does step by step.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 2 · ~1 week</span>
+<h3>Tokenization &amp; embeddings — how text becomes numbers</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Byte-Pair Encoding (BPE), WordPiece, SentencePiece; vocabulary size trade-offs; why "strawberry has two r's" failures happen; why tokenization drives API cost.</li>
+<li>Static embeddings (word2vec: skip-gram, CBOW) → contextual embeddings; the king − man + woman = queen geometry.</li>
+<li>Embedding matrices as the first layer of every LLM.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=zduSFxRajkE">Karpathy — "Let's build the GPT Tokenizer"</a> (build BPE from scratch)</li>
+<li><a href="https://arxiv.org/abs/1301.3781">word2vec paper — "Efficient Estimation of Word Representations"</a> (Mikolov et al., 2013)</li>
+<li><a href="https://jalammar.github.io/illustrated-word2vec/">Jay Alammar — The Illustrated Word2vec</a></li>
+<li><a href="https://github.com/openai/tiktoken">openai/tiktoken</a> and <a href="https://platform.openai.com/tokenizer">the tokenizer playground</a> (paste text, watch it split)</li>
+<li>JS: <a href="https://github.com/dqbd/tiktoken">dqbd/tiktoken</a> (WASM bindings for Node/browser)</li>
+</ul>
+<div class="checkpoint">Implement BPE training in TypeScript on a small corpus (e.g., a book from Project Gutenberg). Show the learned merges. Then build a small web page where typing text shows live token counts using tiktoken-WASM.
+<div class="expected">Expected: your BPE produces sensible subwords, and you can explain why "internationalization" is ~4 tokens but "the" is 1.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 3 · ~2 weeks (the core)</span>
+<h3>The Transformer &amp; attention, in full depth</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Scaled dot-product attention: Q, K, V matrices — what each projection means; why divide by √d<sub>k</sub>; causal masking.</li>
+<li>Multi-head attention: why multiple heads, what different heads learn.</li>
+<li>The full decoder block: attention → residual → LayerNorm → MLP → residual; why residual streams matter.</li>
+<li>Positional information: sinusoidal encodings vs. learned vs. RoPE (rotary) — what modern models actually use.</li>
+<li>The KV cache — why generation is fast after the first token, and why long contexts eat memory.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/1706.03762">"Attention Is All You Need"</a> (Vaswani et al., 2017 — read after the visual resources, not before)</li>
+<li><a href="https://jalammar.github.io/illustrated-transformer/">Jay Alammar — The Illustrated Transformer</a> (start here)</li>
+<li><a href="https://www.youtube.com/watch?v=kCc8FmEb1nY">Karpathy — "Let's build GPT: from scratch, in code, spelled out"</a> (the single best resource in this curriculum)</li>
+<li><a href="https://github.com/karpathy/nanoGPT">karpathy/nanoGPT</a> (repo to read line by line)</li>
+<li><a href="https://arxiv.org/abs/2104.09864">RoFormer / RoPE paper</a> (Su et al., 2021)</li>
+<li><a href="https://bbycroft.net/llm">bbycroft.net/llm</a> — interactive 3D visualization of a running transformer (built in JS, incidentally)</li>
+</ul>
+<div class="checkpoint">Follow Karpathy's video and build nanoGPT in Python (this is the one milestone where Python is genuinely the right tool — PyTorch has no TS equivalent). Train a character-level model on Shakespeare. Then, separately, implement single-head scaled dot-product attention in pure TypeScript for a fixed toy input and verify the output against a hand computation.
+<div class="expected">Expected: generated Shakespeare-ish text, and you can whiteboard the attention formula and say what every symbol does.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 4 · ~1 week</span>
+<h3>How models are trained: pretraining → instruction tuning → alignment</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Pretraining: next-token prediction at scale; data pipelines; scaling laws (Kaplan, Chinchilla) — why model and data size trade off.</li>
+<li>Supervised fine-tuning (SFT) and instruction tuning: how a text-completer becomes an assistant.</li>
+<li>RLHF and DPO: reward models, preference optimization; what "alignment" concretely means.</li>
+<li>Parameter-efficient fine-tuning: LoRA/QLoRA — the low-rank trick, when fine-tuning beats RAG (rarely) and when it doesn't.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/2001.08361">Scaling Laws for Neural Language Models</a> (Kaplan et al., 2020)</li>
+<li><a href="https://arxiv.org/abs/2203.15556">Chinchilla — "Training Compute-Optimal LLMs"</a> (Hoffmann et al., 2022)</li>
+<li><a href="https://arxiv.org/abs/2203.02155">InstructGPT paper</a> (Ouyang et al., 2022 — the RLHF blueprint)</li>
+<li><a href="https://arxiv.org/abs/2305.18290">DPO — "Direct Preference Optimization"</a> (Rafailov et al., 2023)</li>
+<li><a href="https://arxiv.org/abs/2106.09685">LoRA paper</a> (Hu et al., 2021)</li>
+<li><a href="https://www.youtube.com/watch?v=zjkBMFhNj_g">Karpathy — "Intro to Large Language Models"</a> (1-hour big-picture talk)</li>
+<li><a href="https://huggingface.co/learn/nlp-course">Hugging Face NLP Course</a> (chapters on fine-tuning)</li>
+</ul>
+<div class="checkpoint">Write a one-page explainer (as if to another JS dev) of the full journey: raw internet text → base model → SFT → RLHF/DPO → the chat model you call via API. Include where LoRA fits and one concrete case where you would fine-tune instead of using RAG.
+<div class="expected">Expected: a peer could read it and correctly answer "why does the base model complete text instead of answering questions?"</div></div>
+</div>
+
+<h2 id="part2">Part II — Using LLMs &amp; the geometry of meaning</h2>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 5 · ~1 week</span>
+<h3>Working with LLMs as an engineer <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Sampling: temperature, top-p, top-k — what each knob actually changes in the softmax distribution.</li>
+<li>Prompt engineering as engineering: system prompts, few-shot, chain-of-thought, XML/structured delimiting, JSON mode / structured outputs.</li>
+<li>Function/tool calling: schemas, parallel calls, the request→tool_use→tool_result loop.</li>
+<li>Streaming (SSE), retries, rate limits, token budgeting and cost math.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview">Anthropic — Prompt engineering docs</a></li>
+<li><a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview">Anthropic — Tool use docs</a></li>
+<li><a href="https://sdk.vercel.ai/docs">Vercel AI SDK docs</a> (TypeScript; streaming, tool calling, structured output)</li>
+<li><a href="https://github.com/anthropics/anthropic-sdk-typescript">anthropic-sdk-typescript</a> · <a href="https://github.com/openai/openai-node">openai-node</a></li>
+<li><a href="https://ollama.com">Ollama</a> (run local models; has a JS client) — compare a local 8B model vs. a frontier API model on the same prompts</li>
+</ul>
+<div class="checkpoint">Build a TS CLI/mini-web app: streams responses, enforces a JSON schema output with retry-on-invalid, exposes temperature/top-p sliders, and logs tokens + cost per request. Demonstrate one tool call (e.g., a calculator the model invokes).
+<div class="expected">Expected: you can predict, before running, how changing temperature from 0 to 1.2 alters output for a factual vs. creative prompt.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 6 · ~1 week</span>
+<h3>Embeddings at scale &amp; approximate nearest-neighbor search <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Modern embedding models (OpenAI text-embedding-3, Cohere embed, open-source bge/e5); Matryoshka embeddings and dimension trade-offs.</li>
+<li>Similarity metrics: cosine vs. dot vs. Euclidean — when normalization makes them equivalent.</li>
+<li>Why exact search dies at scale; ANN algorithms: HNSW (graph-based) and IVF (clustering) — how they work, recall/latency trade-offs.</li>
+<li>Vector databases: Qdrant, pgvector, Pinecone, Chroma — index types, metadata filtering, when Postgres+pgvector is all you need.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/1603.09320">HNSW paper</a> (Malkov &amp; Yashunin, 2016)</li>
+<li><a href="https://www.pinecone.io/learn/">Pinecone Learning Center</a> (excellent free series on vector search &amp; ANN)</li>
+<li><a href="https://arxiv.org/abs/1908.10084">Sentence-BERT paper</a> (Reimers &amp; Gurevych, 2019)</li>
+<li><a href="https://qdrant.tech/documentation/">Qdrant docs</a> (JS client) · <a href="https://github.com/pgvector/pgvector">pgvector</a></li>
+<li><a href="https://huggingface.co/spaces/mteb/leaderboard">MTEB leaderboard</a> (how embedding models are benchmarked)</li>
+</ul>
+<div class="checkpoint">In TypeScript: embed ~5k paragraphs, implement brute-force cosine search yourself, then stand up Qdrant (Docker) and compare — recall@10 of ANN vs. brute force, and latency of both at 5k and 50k vectors.
+<div class="expected">Expected: a small table of numbers you measured, and you can explain what HNSW's "layers" buy you.</div></div>
+</div>
+
+<h2 id="part3">Part III — RAG, from naive to state of the art</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 860 330" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#B8B4A8"/></marker></defs>
+  <text x="10" y="20" font-weight="bold" font-size="14">Advanced RAG pipeline (what you build in M8)</text>
+  <rect x="10" y="45" width="120" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="70" y="65" text-anchor="middle" font-weight="bold">Query</text>
+  <text x="70" y="81" text-anchor="middle" fill="#6B6862">user question</text>
+  <rect x="170" y="45" width="150" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="245" y="65" text-anchor="middle" font-weight="bold">Query transform</text>
+  <text x="245" y="81" text-anchor="middle" fill="#6B6862">rewrite · HyDE · multi-query</text>
+  <rect x="360" y="20" width="150" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="435" y="40" text-anchor="middle" font-weight="bold">Dense retrieval</text>
+  <text x="435" y="56" text-anchor="middle" fill="#6B6862">vector ANN search</text>
+  <rect x="360" y="76" width="150" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="435" y="96" text-anchor="middle" font-weight="bold">Sparse retrieval</text>
+  <text x="435" y="112" text-anchor="middle" fill="#6B6862">BM25 keyword</text>
+  <rect x="360" y="132" width="150" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="435" y="152" text-anchor="middle" font-weight="bold">Graph retrieval</text>
+  <text x="435" y="168" text-anchor="middle" fill="#6B6862">entity/community walk</text>
+  <rect x="550" y="76" width="130" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="615" y="96" text-anchor="middle" font-weight="bold">Fusion + rerank</text>
+  <text x="615" y="112" text-anchor="middle" fill="#6B6862">RRF → cross-encoder</text>
+  <rect x="720" y="76" width="130" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="785" y="96" text-anchor="middle" font-weight="bold">Generate</text>
+  <text x="785" y="112" text-anchor="middle" fill="#6B6862">grounded + cited</text>
+  <line x1="130" y1="68" x2="170" y2="68" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="320" y1="60" x2="360" y2="45" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="320" y1="68" x2="360" y2="99" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="320" y1="76" x2="360" y2="152" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="510" y1="43" x2="550" y2="90" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="510" y1="99" x2="550" y2="99" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="510" y1="155" x2="550" y2="110" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <line x1="680" y1="99" x2="720" y2="99" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <path d="M785,122 C785,220 245,230 245,95" stroke="#C15F3C" stroke-width="1.2" fill="none" stroke-dasharray="5,4" marker-end="url(#ar2)"/>
+  <text x="510" y="245" text-anchor="middle" fill="#C15F3C" font-size="11">self-correction loop: grade retrieval → if weak, rewrite query and retry (CRAG / Self-RAG)</text>
+  <rect x="10" y="270" width="840" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1"/>
+  <text x="430" y="290" text-anchor="middle" fill="#6B6862">Offline ingestion: load → chunk (structure-aware) → contextualize → embed → index (vector + BM25 + knowledge graph)</text>
+  <text x="430" y="306" text-anchor="middle" fill="#6B6862">Evaluation harness wraps everything: faithfulness · answer relevance · context precision/recall (M9)</text>
+</svg>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 7 · ~1 week</span>
+<h3>RAG fundamentals — and why naive RAG fails <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li>The core RAG loop: retrieve top-k → stuff into context → generate; why RAG beats fine-tuning for knowledge injection (freshness, provenance, cost).</li>
+<li>Chunking: fixed-size vs. recursive vs. semantic vs. structure-aware (headings, code blocks); overlap; chunk-size trade-offs.</li>
+<li>Failure modes to induce deliberately: lost-in-the-middle, chunk-boundary splits, vocabulary mismatch, multi-hop questions naive RAG cannot answer.</li>
+<li>Citations and grounding: making the model quote its sources.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/2005.11401">The original RAG paper</a> (Lewis et al., 2020)</li>
+<li><a href="https://arxiv.org/abs/2307.03172">"Lost in the Middle"</a> (Liu et al., 2023)</li>
+<li><a href="https://python.langchain.com/docs/tutorials/rag/">LangChain RAG tutorial</a> · <a href="https://js.langchain.com/docs/">LangChain.js docs</a> · <a href="https://ts.llamaindex.ai/">LlamaIndex.TS</a></li>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic — Contextual Retrieval</a> (prepending chunk context before embedding; large accuracy gains, simple idea)</li>
+</ul>
+<div class="checkpoint">Build a naive RAG pipeline in TS over ~50 markdown/PDF docs. Then write 10 questions where it fails, categorize each failure (retrieval miss? chunking? generation?), and keep this list — it becomes your M9 eval set.
+<div class="expected">Expected: a working pipeline AND a documented failure taxonomy. The failures are the real deliverable.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 8 · ~2 weeks</span>
+<h3>Advanced RAG: hybrid, transformation, re-ranking, Graph RAG <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li><b>Hybrid search:</b> BM25 (the math: TF-IDF → BM25 saturation) + dense vectors; Reciprocal Rank Fusion (RRF).</li>
+<li><b>Query transformation:</b> rewriting, decomposition, multi-query expansion, HyDE (embed a hypothetical answer), step-back prompting.</li>
+<li><b>Re-ranking:</b> bi-encoder vs. cross-encoder — why cross-encoders are more accurate and too slow for first-stage; two-stage retrieval.</li>
+<li><b>Contextual retrieval:</b> LLM-generated chunk context at index time.</li>
+<li><b>Graph RAG:</b> entity/relation extraction → knowledge graph → community summaries; when graphs beat vectors (multi-hop, "how does X relate to Y" questions).</li>
+<li><b>Self-correcting retrieval:</b> CRAG (grade retrievals, fall back to web search) and Self-RAG (model critiques its own groundedness).</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/2212.10496">HyDE paper</a> (Gao et al., 2022)</li>
+<li><a href="https://docs.cohere.com/docs/rerank">Cohere Rerank docs</a> · <a href="https://huggingface.co/BAAI/bge-reranker-large">bge-reranker</a> (open source)</li>
+<li><a href="https://arxiv.org/abs/2404.16130">GraphRAG paper</a> (Edge et al., Microsoft 2024) · <a href="https://github.com/microsoft/graphrag">microsoft/graphrag</a> (repo)</li>
+<li><a href="https://arxiv.org/abs/2401.15884">CRAG — Corrective RAG</a> (Yan et al., 2024)</li>
+<li><a href="https://arxiv.org/abs/2310.11511">Self-RAG paper</a> (Asai et al., 2023)</li>
+<li><a href="https://weaviate.io/blog/hybrid-search-explained">Weaviate — Hybrid Search Explained</a></li>
+<li><a href="https://github.com/NirDiamant/RAG_Techniques">NirDiamant/RAG_Techniques</a> (repo — dozens of RAG patterns with runnable notebooks; the best single RAG repo to study)</li>
+</ul>
+<div class="checkpoint">Upgrade your M7 pipeline: add BM25 + RRF fusion, multi-query expansion, and a cross-encoder reranker. Re-run your 10 failure questions — document which failures each technique fixed. Then build a minimal Graph RAG index over the same corpus and find one question only the graph can answer.
+<div class="expected">Expected: a before/after table per technique. If you can't name which technique fixed which failure, you added them blindly — go back.</div></div>
+</div>
+
+<h2 id="part4">Part IV — Evaluation, agents, production</h2>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 9 · ~1 week</span>
+<h3>Evaluation frameworks — Ragas, TruLens, promptfoo</h3>
+<h4>What you will learn</h4>
+<ul>
+<li>The RAG triad (TruLens): context relevance, groundedness, answer relevance.</li>
+<li>Ragas metrics: faithfulness, answer relevancy, context precision, context recall — how each is computed with LLM-as-judge, and the pitfalls of LLM judges.</li>
+<li>Building golden datasets; synthetic test-set generation; regression testing prompts like code.</li>
+<li>Tracing and observability: spans for every retrieve/rerank/generate step.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://docs.ragas.io/en/stable/">Ragas docs</a> (Python — worth the small detour; concepts pages explain each metric's math)</li>
+<li><a href="https://www.trulens.org/">TruLens docs</a> (the RAG triad)</li>
+<li><a href="https://www.promptfoo.dev/docs/intro/">promptfoo docs</a> (TS-native eval harness — your CI tool)</li>
+<li><a href="https://langfuse.com/docs">Langfuse docs</a> (tracing; first-class JS SDK)</li>
+</ul>
+<div class="checkpoint">Turn your M7 failure list plus 20 new Q&amp;A pairs into a versioned eval set. Wire promptfoo to score faithfulness and relevance on every run, and Langfuse to trace every pipeline stage. Produce one chart: naive RAG vs. advanced RAG scores on the same set.
+<div class="expected">Expected: a reproducible <code>npm run eval</code> that fails if faithfulness drops below a threshold — evaluation as CI, not as a one-off notebook.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 10 · ~1.5 weeks</span>
+<h3>Agents, routing &amp; multi-agent orchestration <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li>The ReAct loop (reason → act → observe) implemented by hand — no framework black boxes.</li>
+<li>Routing: classify the query, send it to the right retriever/model/pipeline; semantic routers.</li>
+<li>Multi-agent patterns: orchestrator–worker, critic/reviewer loops, when multiple agents genuinely beat one (and when they're hype).</li>
+<li>State machines for agents (LangGraph.js); handling loops, budgets, and failure recovery.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://arxiv.org/abs/2210.03629">ReAct paper</a> (Yao et al., 2022)</li>
+<li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a> (the essential essay on when NOT to use agents)</li>
+<li><a href="https://langchain-ai.github.io/langgraphjs/">LangGraph.js docs</a></li>
+<li><a href="https://sdk.vercel.ai/docs/foundations/agents">Vercel AI SDK — agents</a></li>
+</ul>
+<div class="checkpoint">Implement a ReAct agent in raw TypeScript (no framework) with three tools: your RAG pipeline, a calculator, and web search. Add a critic step that grades answers for groundedness and triggers one retry. Then rebuild it in LangGraph.js and write 5 sentences on what the framework bought you.
+<div class="expected">Expected: visible reasoning traces, a bounded loop (max N steps), and an informed opinion on frameworks vs. hand-rolled.</div></div>
+</div>
+
+<div class="milestone">
+<span class="m-num">MILESTONE 11 · ~1 week</span>
+<h3>Production engineering <span class="tag">TS-first</span></h3>
+<h4>What you will learn</h4>
+<ul>
+<li>Streaming architectures end to end (server → SSE → React UI); optimistic UI for agent steps.</li>
+<li>Prompt caching (90% cost cuts on repeated context); semantic response caching; model routing (cheap model first, escalate on low confidence).</li>
+<li>Incremental re-indexing; document-change detection; index versioning.</li>
+<li>Guardrails: input/output filtering, prompt-injection defenses for RAG (retrieved content is untrusted input!).</li>
+<li>Deployment: Docker, serverless trade-offs for long-running agent loops, monitoring with your M9 eval suite as a canary.</li>
+</ul>
+<h4>Resources</h4>
+<ul>
+<li><a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching">Anthropic — Prompt caching docs</a></li>
+<li><a href="https://simonwillison.net/series/prompt-injection/">Simon Willison — prompt injection series</a> (required reading)</li>
+<li><a href="https://huyenchip.com/blog/">Chip Huyen's blog</a> (production ML/LLM systems essays)</li>
+<li><a href="https://fastapi.tiangolo.com/">FastAPI</a> if you ever need Python services; otherwise <a href="https://hono.dev/">Hono</a> / Next.js API routes</li>
+</ul>
+<div class="checkpoint">Containerize the full system. Add prompt caching and measure the cost delta on 50 queries. Write one prompt-injection attack that hijacks your own RAG pipeline via a poisoned document, then patch it.
+<div class="expected">Expected: a docker-compose that boots everything, a real cost number, and a working exploit + fix — that last one is a fantastic interview story.</div></div>
+</div>
+
+<h2 id="project">Flagship Portfolio Project — <b>RepoSage</b></h2>
+<p class="subtitle">A self-correcting, multi-agent codebase intelligence engine</p>
+
+<p><b>The pitch:</b> point RepoSage at any Git repository and it becomes the senior engineer who has been on the team for years. It answers not just "where is X?" but <i>"why is X built this way?"</i> — by retrieving over three synchronized indexes: the code itself (AST-aware), the git history (commits, blame, PR descriptions), and the documentation (including <b>architecture diagrams, parsed multimodally</b>). A router agent picks retrieval strategies, a critic agent grades every answer for groundedness before it ships, and failed retrievals trigger self-correcting query rewrites (CRAG-style). This is not chat-with-your-PDF — it is multi-index hybrid retrieval + Graph RAG over code relationships + multi-agent orchestration + multimodal ingestion + a full eval harness, wrapped in a polished streaming React UI (your JS advantage, weaponized).</p>
+
+<div class="diagram">
+<svg viewBox="0 0 860 400" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="ar3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#B8B4A8"/></marker></defs>
+  <text x="10" y="20" font-weight="bold" font-size="14">RepoSage architecture</text>
+  <rect x="10" y="40" width="130" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="75" y="60" text-anchor="middle" font-weight="bold">React UI</text>
+  <text x="75" y="76" text-anchor="middle" fill="#6B6862">streaming, traces</text>
+  <rect x="180" y="40" width="140" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="250" y="60" text-anchor="middle" font-weight="bold">Router agent</text>
+  <text x="250" y="76" text-anchor="middle" fill="#6B6862">intent → strategy</text>
+  <rect x="370" y="10" width="150" height="42" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="445" y="27" text-anchor="middle" font-weight="bold">Code agent</text>
+  <text x="445" y="43" text-anchor="middle" fill="#6B6862">AST chunks · symbols</text>
+  <rect x="370" y="62" width="150" height="42" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="445" y="79" text-anchor="middle" font-weight="bold">History agent</text>
+  <text x="445" y="95" text-anchor="middle" fill="#6B6862">commits · blame · PRs</text>
+  <rect x="370" y="114" width="150" height="42" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="445" y="131" text-anchor="middle" font-weight="bold">Docs agent</text>
+  <text x="445" y="147" text-anchor="middle" fill="#6B6862">md · diagrams (vision)</text>
+  <rect x="560" y="62" width="140" height="42" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1.5"/>
+  <text x="630" y="79" text-anchor="middle" font-weight="bold">Synthesizer</text>
+  <text x="630" y="95" text-anchor="middle" fill="#6B6862">fuse + cite</text>
+  <rect x="740" y="62" width="110" height="42" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="795" y="79" text-anchor="middle" font-weight="bold">Critic agent</text>
+  <text x="795" y="95" text-anchor="middle" fill="#6B6862">grade · retry</text>
+  <line x1="140" y1="63" x2="180" y2="63" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="320" y1="52" x2="370" y2="31" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="320" y1="63" x2="370" y2="83" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="320" y1="74" x2="370" y2="135" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="520" y1="31" x2="560" y2="72" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="520" y1="83" x2="560" y2="83" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="520" y1="135" x2="560" y2="94" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="700" y1="83" x2="740" y2="83" stroke="#B8B4A8" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <path d="M795,104 C795,180 250,180 250,86" stroke="#C15F3C" stroke-width="1.2" fill="none" stroke-dasharray="5,4" marker-end="url(#ar3)"/>
+  <text x="520" y="196" text-anchor="middle" fill="#C15F3C" font-size="11">low groundedness score → rewrite query, re-route, retry (bounded)</text>
+  <rect x="10" y="225" width="840" height="75" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1"/>
+  <text x="430" y="248" text-anchor="middle" font-weight="bold">Three synchronized indexes (offline ingestion, incremental on git push)</text>
+  <text x="430" y="268" text-anchor="middle" fill="#6B6862">1. Vector + BM25 over AST-aware code chunks &amp; contextualized doc chunks (tree-sitter, contextual retrieval)</text>
+  <text x="430" y="286" text-anchor="middle" fill="#6B6862">2. Knowledge graph: symbols, files, authors, commits — imports/calls/modified-by edges (Graph RAG) · 3. Multimodal: diagram descriptions via vision model</text>
+  <rect x="10" y="320" width="840" height="46" rx="8" fill="#F4F3EE" stroke="#B8B4A8" stroke-width="1"/>
+  <text x="430" y="340" text-anchor="middle" font-weight="bold">Eval harness (promptfoo + Langfuse)</text>
+  <text x="430" y="357" text-anchor="middle" fill="#6B6862">golden Q&amp;A set per repo · faithfulness/relevance gates in CI · cost + latency budgets · injection red-team suite</text>
+</svg>
+</div>
+
+<h3>Why this project stands out</h3>
+<ul>
+<li><b>Nobody's demo does "why".</b> Answering "why was this pattern chosen?" requires joining code + git archaeology + docs — three retrieval modalities fused. That's a systems story, not a tutorial clone.</li>
+<li><b>Self-correction is visible.</b> The UI shows the critic rejecting an answer and the router retrying — reviewers <i>see</i> the advanced architecture working.</li>
+<li><b>It's demoable on any public repo</b> — an interviewer can name a repo and watch it work live.</li>
+<li><b>Every curriculum topic is load-bearing:</b> tokenization (cost budgeting), attention (context ordering), embeddings/ANN, hybrid + Graph RAG, agents, evals, production hardening.</li>
+</ul>
+
+<h3>Build plan — mapped to milestones</h3>
+<table>
+<tr><th>After milestone</th><th>Project task</th></tr>
+<tr><td>M0–M1</td><td>Repo scaffold (TS monorepo: <code>ingestion/ retrieval/ agents/ eval/ web/</code>). Build the cosine/softmax utils you'll reuse in retrieval.</td></tr>
+<tr><td>M2</td><td>Token-budget module: count tokens per chunk (tiktoken-WASM), enforce context budgets, per-query cost estimator.</td></tr>
+<tr><td>M3</td><td>Write "How attention constrains RAG" design note: derive your context-ordering strategy (best chunks at edges) from lost-in-the-middle + attention understanding.</td></tr>
+<tr><td>M4</td><td>Model-selection doc: which model for router vs. synthesizer vs. critic vs. vision, with cost math. (Cheap+fast router, strong synthesizer.)</td></tr>
+<tr><td>M5</td><td>LLM gateway layer: typed client with streaming, structured outputs, retries, cost logging — every agent will call through this.</td></tr>
+<tr><td>M6</td><td>Stand up Qdrant + embeddings service. Ingest first repo's README/docs, verify search quality manually.</td></tr>
+<tr><td>M7</td><td>Naive RAG v1 over docs + code (dumb line-based chunking). Record its failure list — this seeds your eval set.</td></tr>
+<tr><td>M8</td><td>The big one: AST-aware chunking (tree-sitter), contextual retrieval, BM25+RRF hybrid, cross-encoder rerank, knowledge graph (symbols/commits/imports), git-history index, multimodal diagram ingestion via a vision model.</td></tr>
+<tr><td>M9</td><td>Golden eval set (30+ Q&amp;A incl. 10 "why" questions), promptfoo CI gates, Langfuse tracing on every stage.</td></tr>
+<tr><td>M10</td><td>Agent layer: router, three retrieval agents, synthesizer, critic with bounded CRAG-style retry loop. Streaming reasoning traces to the UI.</td></tr>
+<tr><td>M11</td><td>Ship: polished React UI, Docker Compose, prompt caching (measure savings), injection red-team + fixes, incremental re-index on git push, README with architecture diagram + eval numbers.</td></tr>
+</table>
+
+<h2 id="appendix">Appendix</h2>
+<h3>Core paper reading list (in reading order)</h3>
+<ol>
+<li><a href="https://arxiv.org/abs/1301.3781">word2vec</a> (2013)</li>
+<li><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a> (2017)</li>
+<li><a href="https://arxiv.org/abs/1810.04805">BERT</a> (2018)</li>
+<li><a href="https://arxiv.org/abs/2005.14165">GPT-3 — "Language Models are Few-Shot Learners"</a> (2020)</li>
+<li><a href="https://arxiv.org/abs/2001.08361">Scaling Laws</a> (2020)</li>
+<li><a href="https://arxiv.org/abs/2005.11401">RAG</a> (2020)</li>
+<li><a href="https://arxiv.org/abs/2203.02155">InstructGPT</a> (2022)</li>
+<li><a href="https://arxiv.org/abs/2210.03629">ReAct</a> (2022)</li>
+<li><a href="https://arxiv.org/abs/2212.10496">HyDE</a> (2022)</li>
+<li><a href="https://arxiv.org/abs/2305.18290">DPO</a> (2023)</li>
+<li><a href="https://arxiv.org/abs/2310.11511">Self-RAG</a> (2023)</li>
+<li><a href="https://arxiv.org/abs/2401.15884">CRAG — Corrective RAG</a> (2024)</li>
+<li><a href="https://arxiv.org/abs/2404.16130">GraphRAG</a> (2024)</li>
+</ol>
+<h3>Suggested weekly cadence</h3>
+<p>Mon–Tue: consume resources (videos/papers). Wed–Thu: checkpoint assignment. Fri–weekend: project task for the milestone. If a checkpoint takes longer than planned, let it — the checkpoints are the curriculum; the reading is just preparation.</p>
+<p class="expected">Compiled July 2026. Links are to stable primary sources (arXiv, official docs); if any moves, search the paper title.</p>
+
+</body>
+</html>
+    
