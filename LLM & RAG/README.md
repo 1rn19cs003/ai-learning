@@ -9,7 +9,8 @@ Self-paced curriculum and project plan for going from LLM fundamentals to advanc
 | `curriculum/LLM_RAG_Curriculum.html` | The main document: 12 milestones (math → transformers → training → prompting → embeddings/ANN → naive RAG → advanced RAG → evals → agents → production), each with resources and a checkpoint assignment. Includes the **RepoSage** flagship portfolio project with milestone-mapped build tasks. Open in a browser; diagrams are embedded. |
 | `notes/Handwritten_Notes.html` | Handwritten-style study notes: all 4 parts explained in plain language with analogies and sketched diagrams. 12 notebook pages, one per big idea. Open in a browser. |
 | `plan/LLM_RAG_Project_Plan.docx` | Original 8-week project plan (Word). PDF render alongside. |
-| `diagrams/LLM_RAG_Project.drawio` | Editable diagrams — open at [app.diagrams.net](https://app.diagrams.net). Page 1: system architecture. Page 2: 8-week roadmap. |
+| `diagrams/Diagrams.html` | **View the diagrams in your browser** (interactive: page tabs, zoom, pan). Needs internet for the viewer script. |
+| `diagrams/LLM_RAG_Project.drawio` | Editable source — open at [app.diagrams.net](https://app.diagrams.net) → File → Open From → Device. Page 1: system architecture. Page 2: 8-week roadmap. |
 
 ## Where to start
 

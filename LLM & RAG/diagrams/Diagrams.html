@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM &amp; RAG — Diagrams</title>
+<style>
+  body { font-family: Georgia, serif; color: #21201C; background: #FAF9F5; max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
+  h1 { font-size: 28px; color: #C15F3C; margin-bottom: 4px; }
+  .subtitle { color: #6B6862; margin-top: 0; }
+  nav a { font-family: Arial, sans-serif; font-size: 13px; text-decoration: none; color: #C15F3C; border: 1px solid #C15F3C; border-radius: 16px; padding: 5px 14px; margin-right: 8px; }
+  nav a:hover { background: #C15F3C; color: #fff; }
+  .viewer-box { background: #fff; border: 1px solid #D9D6CE; border-radius: 12px; padding: 12px; margin: 24px 0; min-height: 300px; }
+  .note { background: #FDF6EC; border: 1px solid #EFD9B4; border-radius: 6px; padding: 10px 16px; font-size: 14px; margin: 16px 0; font-family: Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html">← All tracks</a>
+  <a href="../curriculum/LLM_RAG_Curriculum.html">📚 Curriculum</a>
+  <a href="../notes/Handwritten_Notes.html">✎ Notes</a>
+</nav>
+
+<h1>Project diagrams</h1>
+<p class="subtitle">Use the toolbar to switch pages (Architecture / 8-Week Roadmap), zoom, and pan.</p>
+
+<div class="note">This viewer needs an internet connection (it loads the diagrams.net viewer script). To <b>edit</b> the diagrams, open <code>LLM_RAG_Project.drawio</code> at <a href="https://app.diagrams.net">app.diagrams.net</a> → File → Open From → Device.</div>
+
+<div class="viewer-box">
+  <div id="viewer"></div>
+</div>
+
+<script type="text/xml" id="dxml"><mxfile host="app.diagrams.net" modified="2026-07-19T00:00:00.000Z" agent="Claude" version="24.0.0" type="device">
+  <diagram name="Architecture" id="architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title1" value="System Architecture — Research &amp; Coding Assistant" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="user" value="User&#10;query / chat UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5E8DC;strokeColor=#C15F3C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="20" y="70" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API layer&#10;FastAPI + streaming" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="70" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="orch" value="Agent orchestrator&#10;ReAct loop, planning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5E8DC;strokeColor=#C15F3C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="70" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="llm" value="LLM&#10;Claude / GPT / local" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="640" y="20" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retriever" value="Retriever&#10;vector + BM25 + rerank" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="640" y="90" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="tools" value="Tools&#10;code exec, search, git" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="640" y="160" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="vectordb" value="Vector DB + index&#10;Chroma / FAISS / Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="860" y="90" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ingestlabel" value="Ingestion pipeline" style="text;html=1;fontSize=13;fontStyle=1;align=left;verticalAlign=middle;fontColor=#6B6862;" vertex="1" parent="1">
+          <mxGeometry x="860" y="175" width="200" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="load" value="Load&#10;docs, code, PDFs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="860" y="200" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="chunk" value="Chunk&#10;AST / semantic split" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="200" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="embed" value="Embed&#10;text-embedding model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="935" y="270" width="205" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="eval" value="Eval &amp; logging&#10;RAGAS, Langfuse, cost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="160" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="user" target="api"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="api" target="orch"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="orch" target="llm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="orch" target="retriever"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="orch" target="tools"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="retriever" target="vectordb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="load" target="chunk"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="chunk" target="embed"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="embed" target="vectordb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;dashed=1;" edge="1" parent="1" source="orch" target="eval"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="8-Week Roadmap" id="roadmap">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1560" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="rtitle" value="8-Week Roadmap" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" value="WEEK 1&#10;LLM Foundations&#10;&#10;Tokenization, embeddings,&#10;prompt engineering, calling&#10;LLM APIs, local model w/ Ollama" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" value="WEEK 2&#10;RAG Basics&#10;&#10;Loaders, chunking, vector&#10;stores, first retrieve +&#10;generate pipeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="210" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" value="WEEK 3&#10;Advanced RAG&#10;&#10;Hybrid search, reranking,&#10;query rewriting / HyDE,&#10;metadata filters" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="400" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" value="WEEK 4&#10;Agents &amp; Tool Use&#10;&#10;Function calling, ReAct&#10;loop, multi-step tool&#10;chains" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="590" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w5" value="WEEK 5&#10;Code-Aware Retrieval&#10;&#10;tree-sitter/AST parsing,&#10;codebase indexing,&#10;git integration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="780" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w6" value="WEEK 6&#10;Evaluation &amp; Guardrails&#10;&#10;RAGAS metrics, labeled&#10;eval set, hallucination&#10;checks, Langfuse tracing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="970" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w7" value="WEEK 7&#10;Fine-Tuning &amp; Optimization&#10;&#10;LoRA/QLoRA, prompt&#10;caching, model routing,&#10;quantization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F3EE;strokeColor=#B8B4A8;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="w8" value="WEEK 8&#10;Deployment&#10;&#10;FastAPI + streaming, UI,&#10;Docker, CI eval gate,&#10;monitoring — ship it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5E8DC;strokeColor=#C15F3C;fontSize=11;align=left;spacingLeft=8;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="60" width="170" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="re1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w1" target="w2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w2" target="w3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w3" target="w4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w4" target="w5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w5" target="w6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w6" target="w7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="re7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#B8B4A8;" edge="1" parent="1" source="w7" target="w8"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="deliv" value="Deliverable: a deployed research &amp; coding assistant — RAG + agent + eval, containerized, with a working UI." style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;fontColor=#6B6862;" vertex="1" parent="1">
+          <mxGeometry x="20" y="230" width="700" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile></script>
+
+<script>
+(function () {
+  var xml = document.getElementById('dxml').textContent.trim();
+  var el = document.getElementById('viewer');
+  el.className = 'mxgraph';
+  el.setAttribute('data-mxgraph', JSON.stringify({
+    xml: xml,
+    toolbar: 'pages zoom layers',
+    'toolbar-position': 'top',
+    nav: true,
+    resize: true,
+    highlight: '#C15F3C'
+  }));
+  var s = document.createElement('script');
+  s.src = 'https://viewer.diagrams.net/js/viewer-static.min.js';
+  document.body.appendChild(s);
+})();
+</script>
+
+</body>
+</html>
