@@ -405,7 +405,7 @@
 <div class="expected">Expected: a reproducible <code>npm run eval</code> that fails if faithfulness drops below a threshold — evaluation as CI, not as a one-off notebook.</div></div>
 </div>
 
-<div class="milestone" id="m1">
+<div class="milestone" id="m10">
 <span class="m-num">MILESTONE 10 · ~1.5 weeks</span>
 <h3>Agents, routing &amp; multi-agent orchestration <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -426,7 +426,7 @@
 <div class="expected">Expected: visible reasoning traces, a bounded loop (max N steps), and an informed opinion on frameworks vs. hand-rolled.</div></div>
 </div>
 
-<div class="milestone" id="m1">
+<div class="milestone" id="m11">
 <span class="m-num">MILESTONE 11 · ~1 week</span>
 <h3>Production engineering <span class="tag">TS-first</span></h3>
 <h4>What you will learn</h4>
@@ -498,6 +498,75 @@
 </svg>
 </div>
 
+<h3>What is RepoSage, in plain words?</h3>
+<p>Imagine joining a company where one senior engineer has been there 10 years. Ask them anything — "why do we use two payment services?", "who understands the auth module?", "why was caching removed last year?" — and they just know, because they've read all the code, lived through all the changes, and remember all the discussions. <b>RepoSage is that engineer as software.</b> You point it at any Git repository, it "reads" everything (code, history, docs, even diagrams), and then you chat with it. The special part: it doesn't just search text — it understands <i>relationships</i> (what calls what, who changed what, when and why), checks its own answers before showing them, and shows you exactly where every claim came from.</p>
+
+<h3>Every component explained — what it is and the work you will do</h3>
+
+<h4>1 · React UI (the face)</h4>
+<p><b>What it is:</b> a chat window in the browser, like ChatGPT's interface but yours. Answers appear word by word (streaming), and a side panel shows the "thinking steps" — which agent ran, what it searched, what it found.<br>
+<b>Your work:</b> build a Next.js/React app with a chat component, streamed responses over SSE, clickable citations that open the actual file/commit, and a collapsible trace viewer. This is your home turf — make it portfolio-pretty.</p>
+
+<h4>2 · LLM gateway (the phone line)</h4>
+<p><b>What it is:</b> one small module that every part of the system uses to talk to AI models. Nobody calls OpenAI/Anthropic directly — everyone goes through the gateway.<br>
+<b>Why:</b> one place to handle retries when a call fails, log what every call cost, enforce structured JSON outputs, and swap models without touching ten files.<br>
+<b>Your work:</b> a typed TypeScript client wrapping the model APIs with: streaming support, JSON-schema validation with auto-retry, per-call token/cost logging, and a config that maps each role (router/synthesizer/critic/vision) to a model.</p>
+
+<h4>3 · Ingestion pipeline (the reading phase)</h4>
+<p><b>What it is:</b> the offline process that runs BEFORE anyone asks questions. It reads the whole repository and converts it into searchable form. Runs once fully, then incrementally on every git push.<br>
+<b>Your work, step by step:</b></p>
+<ul>
+<li><b>Clone &amp; walk the repo</b> — list every file, skip junk (node_modules, binaries).</li>
+<li><b>Chunk code the smart way</b> — use tree-sitter (a parser) to split code at function/class boundaries, never mid-function. A chunk = one logical unit of code.</li>
+<li><b>Chunk docs</b> — split markdown at headings; keep tables/code blocks whole.</li>
+<li><b>Contextualize</b> — for each chunk, have a cheap LLM write 1–2 lines of context ("this function is part of the payment retry logic in billing/") and prepend it. This massively improves search later.</li>
+<li><b>Embed</b> — turn every chunk into a vector (list of numbers capturing meaning) via an embedding model.</li>
+<li><b>Read git history</b> — every commit message, author, date, and which lines each commit touched (blame). Store as searchable records.</li>
+<li><b>Parse diagrams</b> — find images in docs/READMEs, send them to a vision model ("describe this architecture diagram"), index the descriptions. This is the multimodal part.</li>
+</ul>
+
+<h4>4 · The three indexes (the brain's memory)</h4>
+<p><b>What they are:</b> three different ways of storing the same repository, because different questions need different lookups:</p>
+<ul>
+<li><b>Vector + keyword index</b> (Qdrant + BM25): finds chunks by MEANING ("retry logic" matches "attempt again on failure") and by EXACT terms (function names, error codes). Answers "where/what" questions.</li>
+<li><b>Knowledge graph:</b> a web of nodes and arrows — <code>function A → calls → function B</code>, <code>commit 123 → modified → file X</code>, <code>author Y → wrote → module Z</code>. Answers "how are things connected" and "who/when" questions that pure search can't.</li>
+<li><b>Git history index:</b> commits and PR descriptions, searchable — the "why did this change" memory.</li>
+</ul>
+<p><b>Your work:</b> stand up Qdrant in Docker; implement BM25 (library is fine); build the graph by walking tree-sitter's output (imports/calls) and git log (commits/authors); store it in SQLite or a graph lib — no fancy graph DB needed at this scale.</p>
+
+<h4>5 · Router agent (the receptionist)</h4>
+<p><b>What it is:</b> the first LLM that sees your question. It doesn't answer — it classifies: is this a code question? a history question? a docs question? multiple? Then it dispatches to the right specialist(s).<br>
+<b>Example:</b> "why was rate limiting added to the API?" → router says: history agent (find the commit/PR that added it) + code agent (find the current implementation).<br>
+<b>Your work:</b> a prompt + JSON schema that maps a question to {agents to call, search queries for each}. Use a cheap fast model. ~100 lines including tests.</p>
+
+<h4>6 · Three retrieval agents (the specialists)</h4>
+<p><b>What they are:</b> small workers, each an expert in one index. The <b>code agent</b> searches AST chunks and walks the call graph ("find usages of X"). The <b>history agent</b> searches commits/blame ("when did this change and what did the PR say?"). The <b>docs agent</b> searches documentation and diagram descriptions.<br>
+<b>Your work:</b> each agent = a function that takes a search request, runs hybrid search (vector + BM25 + RRF merge) on its index, reranks the top 50 with a cross-encoder to top 5, and returns chunks WITH their sources. Mostly shared code with three configurations.</p>
+
+<h4>7 · Synthesizer (the writer)</h4>
+<p><b>What it is:</b> the strong LLM that receives the question + everything the specialists found, and writes the final answer with citations like [1](file.ts:42) [2](commit abc123).<br>
+<b>Your work:</b> the synthesis prompt (this takes iteration!), context assembly (best chunks first and last — lost-in-the-middle), and enforcing "every claim must cite a source, say 'not found in this repo' rather than guessing."</p>
+
+<h4>8 · Critic agent (the fact-checker) — the self-correcting part</h4>
+<p><b>What it is:</b> before an answer reaches the user, a second LLM grades it: is every claim supported by the retrieved chunks? Did it actually answer the question?<br>
+<b>If the grade is bad:</b> the critic doesn't just reject — it says WHY ("no evidence found for the claim about caching"), and the system loops back: rewrite the search query, re-retrieve, re-synthesize. Maximum 2 retries, then answer honestly with what it has. This loop is CRAG/Self-RAG from M8, made real.<br>
+<b>Your work:</b> the grading prompt (returns scores + missing-evidence notes as JSON), the bounded retry loop, and streaming "critic rejected draft 1, retrying…" to the UI so visitors SEE it think.</p>
+
+<h4>9 · Eval harness (the report card)</h4>
+<p><b>What it is:</b> ~30 questions about a test repo where YOU verified the answers by hand (the "golden set"). A script asks RepoSage all 30 and scores: faithfulness (no made-up claims), relevance (answered the question), context quality (found the right chunks).<br>
+<b>Why it matters:</b> when you change anything (new prompt, different chunk size), you re-run and instantly see if you made things better or worse. No guessing.<br>
+<b>Your work:</b> write the golden set, wire promptfoo to run it via <code>npm run eval</code>, add Langfuse tracing so every stage of every query is inspectable, and make CI fail if scores drop.</p>
+
+<h3>How one question flows through the system</h3>
+<div class="note">
+<b>You ask:</b> <i>"Why does this project use two different HTTP clients?"</i><br><br>
+<b>1.</b> UI sends the question to the API. <b>Router</b> (cheap model, ~1s) decides: needs <i>code agent</i> ("find HTTP client usages") + <i>history agent</i> ("find commits introducing HTTP clients").<br>
+<b>2.</b> <b>Code agent</b>: hybrid search → finds <code>axios</code> wrapper in <code>lib/http.ts</code> and raw <code>fetch</code> calls in <code>edge/</code>; call-graph shows which modules use which. <b>History agent</b>: finds commit "switch edge functions to fetch — axios breaks on Cloudflare workers" from 2024.<br>
+<b>3.</b> <b>Synthesizer</b> (strong model) writes: "Two clients exist deliberately: axios for the Node server (interceptors for auth), fetch for edge functions because axios is incompatible with the workers runtime — see commit abc123 [2]."<br>
+<b>4.</b> <b>Critic</b> checks each claim against the chunks. The interceptor claim has no supporting chunk → grade fails → system re-searches "axios interceptor", finds it in <code>lib/http.ts:15</code>, re-synthesizes. Grade passes.<br>
+<b>5.</b> Answer streams to the UI with citations; the trace panel shows all 5 steps, timings, and cost (~$0.02).
+</div>
+
 <h3>Why this project stands out</h3>
 <ul>
 <li><b>Nobody's demo does "why".</b> Answering "why was this pattern chosen?" requires joining code + git archaeology + docs — three retrieval modalities fused. That's a systems story, not a tutorial clone.</li>
@@ -507,19 +576,20 @@
 </ul>
 
 <h3>Build plan — mapped to milestones</h3>
+<p>One project task per milestone. Do the milestone's learning first, then its project task — each task uses exactly what you just learned, so nothing here should feel mysterious by the time you reach it.</p>
 <table>
-<tr><th>After milestone</th><th>Project task</th></tr>
-<tr><td>M0–M1</td><td>Repo scaffold (TS monorepo: <code>ingestion/ retrieval/ agents/ eval/ web/</code>). Build the cosine/softmax utils you'll reuse in retrieval.</td></tr>
-<tr><td>M2</td><td>Token-budget module: count tokens per chunk (tiktoken-WASM), enforce context budgets, per-query cost estimator.</td></tr>
-<tr><td>M3</td><td>Write "How attention constrains RAG" design note: derive your context-ordering strategy (best chunks at edges) from lost-in-the-middle + attention understanding.</td></tr>
-<tr><td>M4</td><td>Model-selection doc: which model for router vs. synthesizer vs. critic vs. vision, with cost math. (Cheap+fast router, strong synthesizer.)</td></tr>
-<tr><td>M5</td><td>LLM gateway layer: typed client with streaming, structured outputs, retries, cost logging — every agent will call through this.</td></tr>
-<tr><td>M6</td><td>Stand up Qdrant + embeddings service. Ingest first repo's README/docs, verify search quality manually.</td></tr>
-<tr><td>M7</td><td>Naive RAG v1 over docs + code (dumb line-based chunking). Record its failure list — this seeds your eval set.</td></tr>
-<tr><td>M8</td><td>The big one: AST-aware chunking (tree-sitter), contextual retrieval, BM25+RRF hybrid, cross-encoder rerank, knowledge graph (symbols/commits/imports), git-history index, multimodal diagram ingestion via a vision model.</td></tr>
-<tr><td>M9</td><td>Golden eval set (30+ Q&amp;A incl. 10 "why" questions), promptfoo CI gates, Langfuse tracing on every stage.</td></tr>
-<tr><td>M10</td><td>Agent layer: router, three retrieval agents, synthesizer, critic with bounded CRAG-style retry loop. Streaming reasoning traces to the UI.</td></tr>
-<tr><td>M11</td><td>Ship: polished React UI, Docker Compose, prompt caching (measure savings), injection red-team + fixes, incremental re-index on git push, README with architecture diagram + eval numbers.</td></tr>
+<tr><th style="width:90px">After</th><th>What you build &amp; the actual work</th><th style="width:230px">Done when…</th></tr>
+<tr><td>M0–M1</td><td>Repo scaffold: a TS monorepo with empty packages <code>ingestion/ retrieval/ agents/ eval/ web/</code>, linting, tsconfig, CI skeleton. Then write <code>math.ts</code>: cosine similarity, softmax, dot product — the same functions from your M0 checkpoint, now with unit tests. These get reused by retrieval later.</td><td><code>npm test</code> passes; cosine of two identical vectors returns 1.0.</td></tr>
+<tr><td>M2</td><td>Token-budget module: wrap tiktoken-WASM, expose <code>countTokens(text)</code> and <code>fitToBudget(chunks, maxTokens)</code>, and a cost estimator (tokens × price per model). Every later stage calls this before sending anything to an LLM.</td><td>You can predict a request's cost before sending it, within ~5%.</td></tr>
+<tr><td>M3</td><td>A design note (markdown, in the repo): "How attention constrains RAG" — using what you now know about attention and lost-in-the-middle, decide and document your context-ordering rule (best chunks at the start and end of the prompt, weakest in the middle).</td><td>A teammate could implement context assembly from your note alone.</td></tr>
+<tr><td>M4</td><td>Model-selection doc: pick which model plays router (cheap, fast), synthesizer (strong), critic (mid), vision (multimodal), with per-role cost math for 1000 queries/day. Revisit after M9 when you have real numbers.</td><td>A table of role → model → est. cost/query exists in the repo.</td></tr>
+<tr><td>M5</td><td>The LLM gateway (component #2 above): typed client with streaming, JSON-schema-validated outputs with one auto-retry, per-call cost logging to a local file, role→model config. Port your M5 checkpoint CLI onto it.</td><td>All model calls in the repo go through the gateway; a log line exists for every call.</td></tr>
+<tr><td>M6</td><td>Stand up Qdrant via Docker; write the embedding service (batch, cache by content hash). Ingest one repo's README + docs with naive chunking. Manually search 10 queries, eyeball quality.</td><td>A CLI command <code>ingest &lt;repo-url&gt;</code> exists and search returns sensible chunks.</td></tr>
+<tr><td>M7</td><td>Naive RAG v1 end to end (component #7 minus the smarts): question → top-k vector search → stuff prompt → answer with citations. Deliberately keep chunking dumb. Then interrogate it and write down 10+ failures with your diagnosis of each.</td><td>The failure list is committed — it becomes your golden set.</td></tr>
+<tr><td>M8</td><td>The big one — components #3, #4, #6: tree-sitter AST chunking, contextual retrieval (LLM-written chunk context), BM25 + RRF hybrid, cross-encoder reranking, the knowledge graph (imports/calls/commits/authors), git-history index, and vision-model diagram ingestion. Build in that order; re-test your failure list after each piece.</td><td>Each M7 failure is either fixed (and you know which technique fixed it) or explained.</td></tr>
+<tr><td>M9</td><td>The eval harness (component #9): 30+ golden Q&amp;A including 10 "why" questions, promptfoo scoring faithfulness/relevance, Langfuse tracing on every stage, CI gate.</td><td><code>npm run eval</code> prints scores and fails below threshold.</td></tr>
+<tr><td>M10</td><td>The agent layer (components #5, #6, #8): router, three retrieval agents, synthesizer, critic with the bounded retry loop. Wire reasoning traces through to the API as streamed events.</td><td>The walkthrough scenario above works on a real repo, retry visible.</td></tr>
+<tr><td>M11</td><td>Ship it (components #1 + production): polished React UI with trace panel, Docker Compose for the whole stack, prompt caching (measure the savings on 50 queries), the prompt-injection red-team + fix, incremental re-indexing on git push, and a README with architecture diagram + your eval numbers.</td><td>A stranger can <code>docker compose up</code>, point it at a public repo, and ask "why" questions.</td></tr>
 </table>
 
 <h2 id="appendix">Appendix</h2>
