@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 12 · RepoSage — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html" class="current">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 12.</span> RepoSage — the flagship build</h1>
+<p class="reading-meta">~45 min read · The capstone that uses every prior chapter</p>
+
+<p>Now you assemble everything into one portfolio-defining system. <b>RepoSage</b> is a self-correcting, multi-agent codebase intelligence engine: point it at any Git repository and it answers not just "where is X?" but "<i>why</i> is X built this way?" — by fusing three retrieval modalities (code, git history, docs including diagrams), routing across specialist agents, and grading its own answers before they ship. This chapter gives you the architecture, the component contracts, the interview framing, and the milestone-mapped build plan.</p>
+
+<div class="intuition">Imagine the one engineer who's been on a team for ten years — ask them anything and they just know, because they've read all the code, lived through every refactor, and remember the discussions behind each decision. RepoSage is that engineer as software. The "why" questions are the differentiator: answering them requires joining current code with git archaeology and design docs — three modalities no chat-with-your-PDF demo touches.</div>
+
+<h2 id="why-flagship">12.1 Why this is a flagship, not a tutorial clone</h2>
+<ul>
+<li><b>Nobody's demo answers "why."</b> "Why two HTTP clients?" needs code + the commit that introduced the second + the PR rationale — a systems story, not a retrieval toy.</li>
+<li><b>Self-correction is visible.</b> The UI shows the critic rejecting a draft and the router retrying — reviewers <i>watch</i> the advanced architecture work.</li>
+<li><b>Demoable live on any public repo.</b> An interviewer names a repo; it works. That's a different level of credibility than screenshots.</li>
+<li><b>Every chapter is load-bearing:</b> tokenization (cost budgets), attention (context ordering), embeddings/ANN (retrieval), hybrid + Graph RAG (the three indexes), agents (orchestration), evals (the golden set), production (caching, injection defense). You can defend any layer because you built it.</li>
+</ul>
+
+<h2 id="architecture">12.2 Architecture</h2>
+<div class="diagram">
+<svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="11.5">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
+  <text x="10" y="18" font-weight="bold" font-size="13">RepoSage — request path (top) over three indexes (bottom)</text>
+  <rect x="10" y="36" width="120" height="42" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="70" y="54" text-anchor="middle" font-weight="bold">React UI</text><text x="70" y="70" text-anchor="middle" fill="#6B6862">stream + traces</text>
+  <rect x="165" y="36" width="130" height="42" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="230" y="54" text-anchor="middle" font-weight="bold">Router agent</text><text x="230" y="70" text-anchor="middle" fill="#6B6862">intent → strategy</text>
+  <rect x="345" y="8" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="25" text-anchor="middle" font-weight="bold">Code agent</text><text x="415" y="39" text-anchor="middle" fill="#6B6862">AST · call graph</text>
+  <rect x="345" y="56" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="73" text-anchor="middle" font-weight="bold">History agent</text><text x="415" y="87" text-anchor="middle" fill="#6B6862">commits · blame</text>
+  <rect x="345" y="104" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="121" text-anchor="middle" font-weight="bold">Docs agent</text><text x="415" y="135" text-anchor="middle" fill="#6B6862">md · diagrams(vision)</text>
+  <rect x="525" y="56" width="120" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="585" y="73" text-anchor="middle" font-weight="bold">Synthesizer</text><text x="585" y="87" text-anchor="middle" fill="#6B6862">fuse + cite</text>
+  <rect x="685" y="56" width="120" height="38" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="745" y="73" text-anchor="middle" font-weight="bold">Critic</text><text x="745" y="87" text-anchor="middle" fill="#6B6862">grade · retry</text>
+  <line x1="130" y1="57" x2="161" y2="57" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="295" y1="52" x2="341" y2="27" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="295" y1="57" x2="341" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="295" y1="63" x2="341" y2="123" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="485" y1="27" x2="523" y2="66" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="485" y1="75" x2="523" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="485" y1="123" x2="523" y2="84" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="645" y1="75" x2="683" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M745,94 C745,165 230,165 230,80" stroke="#C15F3C" stroke-width="1.3" fill="none" stroke-dasharray="5,4" marker-end="url(#ar)"/>
+  <text x="500" y="182" text-anchor="middle" fill="#C15F3C">low groundedness → rewrite query, re-route, retry (bounded, ≤2)</text>
+  <rect x="10" y="210" width="795" height="80" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="407" y="232" text-anchor="middle" font-weight="bold">Three synchronized indexes — built offline, incremental on git push</text>
+  <text x="407" y="252" text-anchor="middle" fill="#6B6862">1 · Vector + BM25 over AST-aware code chunks &amp; contextualized doc chunks (tree-sitter, hybrid, rerank)</text>
+  <text x="407" y="270" text-anchor="middle" fill="#6B6862">2 · Knowledge graph: symbols/files/authors/commits with calls/imports/modified-by edges (Graph RAG)</text>
+  <text x="407" y="285" text-anchor="middle" fill="#6B6862">3 · Multimodal: architecture-diagram descriptions via a vision model</text>
+  <rect x="10" y="300" width="795" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="407" y="320" text-anchor="middle" font-weight="bold">Cross-cutting: LLM gateway (all model calls) · Eval harness (golden set, CI gates, tracing) · Prompt caching · Injection defense</text>
+  <text x="407" y="337" text-anchor="middle" fill="#6B6862">everything routes through the gateway; every change is gated by the golden eval set</text>
+</svg>
+</div>
+
+<h2 id="components">12.3 Component contracts</h2>
+<p>Each component with its plain-language role, the chapter it draws on, and its interface:</p>
+<table>
+<tr><th>Component</th><th>Role &amp; source chapter</th><th>Contract (in → out)</th></tr>
+<tr><td>LLM gateway</td><td>One door for all model calls (Ch 5)</td><td><code>generate(prompt, role) → text</code> · <code>generateStructured(prompt, schema, role) → T</code> — streaming, retry, cost logging built in</td></tr>
+<tr><td>Ingestion</td><td>Read the repo into searchable form (Ch 2, 7, 8)</td><td><code>ingest(repoUrl) → void</code>; clone → tree-sitter chunk → contextualize → embed → build 3 indexes</td></tr>
+<tr><td>Router</td><td>Classify &amp; dispatch (Ch 10)</td><td><code>route(question) → { agents[], queries[] }</code> — cheap model, JSON schema</td></tr>
+<tr><td>Retrieval agents ×3</td><td>Specialist search per index (Ch 6, 8)</td><td><code>retrieve(query) → Chunk[]</code>; hybrid + RRF + cross-encoder rerank, returns chunks with sources</td></tr>
+<tr><td>Synthesizer</td><td>Write the cited answer (Ch 5, 7)</td><td><code>synthesize(question, chunks) → { answer, citations }</code> — best chunks at edges, abstain if unsupported</td></tr>
+<tr><td>Critic</td><td>Grade &amp; trigger retry (Ch 8, 9)</td><td><code>grade(answer, chunks) → { faithful: bool, missing[] }</code>; bounded CRAG loop</td></tr>
+<tr><td>Eval harness</td><td>Golden set + CI + tracing (Ch 9)</td><td><code>npm run eval</code> — fails below faithfulness/relevance thresholds</td></tr>
+</table>
+
+<h2 id="walkthrough">12.4 One question, end to end</h2>
+<div class="def" style="border-left-color:#C15F3C;background:#FFF6EC">
+<b>You ask:</b> <i>"Why does this project use two different HTTP clients?"</i><br><br>
+<b>1 · Router</b> (cheap model, ~1s): needs <i>code agent</i> ("find HTTP client usages") + <i>history agent</i> ("commits introducing HTTP clients").<br>
+<b>2 · Code agent:</b> hybrid search finds an <code>axios</code> wrapper in <code>lib/http.ts</code> and raw <code>fetch</code> in <code>edge/</code>; the call graph shows which modules use which. <b>History agent:</b> finds commit "switch edge functions to fetch — axios breaks on Cloudflare Workers," 2024.<br>
+<b>3 · Synthesizer</b> (strong model): "Two clients are deliberate: axios on the Node server for interceptor-based auth [1]; fetch in edge functions because axios is incompatible with the Workers runtime — see commit abc123 [2]."<br>
+<b>4 · Critic:</b> checks each claim against the chunks. The interceptor claim has no supporting chunk → grade fails → re-search "axios interceptor" → found in <code>lib/http.ts:15</code> → re-synthesize → grade passes.<br>
+<b>5 · UI:</b> answer streams with clickable citations; the trace panel shows all five steps, timings, and ~$0.02 cost.
+</div>
+
+<h2 id="build">12.5 Build plan — mapped to chapters</h2>
+<table>
+<tr><th>After</th><th>Build task</th><th>Done when</th></tr>
+<tr><td>Ch 1–3</td><td>TS monorepo scaffold (<code>ingestion/ retrieval/ agents/ eval/ web/</code>); reusable <code>math.ts</code>; a design note on context ordering derived from attention + lost-in-the-middle</td><td><code>npm test</code> green; cosine/softmax verified</td></tr>
+<tr><td>Ch 2</td><td>Token-budget module (tiktoken-WASM): <code>countTokens</code>, <code>fitToBudget</code>, cost estimator</td><td>You can predict a call's cost within ~5%</td></tr>
+<tr><td>Ch 4–5</td><td>LLM gateway (streaming, structured+retry, cost logging, role→model map)</td><td>All model calls flow through it; every call logged</td></tr>
+<tr><td>Ch 6</td><td>Qdrant + embedding service; ingest one repo's docs; manual search sanity check</td><td><code>ingest &lt;repo&gt;</code> works; search returns sensible chunks</td></tr>
+<tr><td>Ch 7</td><td>Naive RAG v1 over docs+code; interrogate; write <code>failures.json</code></td><td>Failure taxonomy committed</td></tr>
+<tr><td>Ch 8</td><td>The big one: tree-sitter AST chunking, contextual retrieval, BM25+RRF, cross-encoder rerank, knowledge graph, git-history index, vision diagram ingestion</td><td>Each Ch 7 failure fixed (and you know which technique fixed it)</td></tr>
+<tr><td>Ch 9</td><td>Golden set (30+, incl. 10 "why"), promptfoo CI gates, Langfuse tracing</td><td><code>npm run eval</code> gates the build</td></tr>
+<tr><td>Ch 10</td><td>Agent layer: router, three retrieval agents, synthesizer, critic + bounded retry; stream traces</td><td>The §12.4 walkthrough works on a real repo, retry visible</td></tr>
+<tr><td>Ch 11</td><td>Ship: polished React UI + trace panel, Docker Compose, prompt caching (measured), injection red-team + fix, incremental re-index, README with diagram + eval numbers</td><td>A stranger runs <code>docker compose up</code>, points at a public repo, asks "why" questions</td></tr>
+</table>
+
+<h2 id="present">12.6 Presenting it in interviews</h2>
+<p>The build is half the value; framing it is the other half. Prepare these:</p>
+<ul>
+<li><b>The 60-second pitch:</b> problem (onboarding to a codebase is slow; "why" knowledge is tribal) → approach (fuse code + history + docs, self-correct, cite) → outcome (live demo on any repo + your eval numbers).</li>
+<li><b>One hard number per layer:</b> "hybrid + rerank raised context precision from 0.61 to 0.89 on my golden set"; "prompt caching cut cost 84%"; "the critic loop caught 30% of drafts as ungrounded." Numbers from <i>your</i> evals are what make it real.</li>
+<li><b>A failure story:</b> the prompt-injection you wrote and patched, or a retrieval failure you diagnosed via tracing and fixed. Senior signal = you talk about what broke and how you found it.</li>
+<li><b>Trade-offs you chose:</b> "I used pgvector not Pinecone because…", "I used a workflow not a fully autonomous agent because errors compound." Owning trade-offs beats claiming everything is optimal.</li>
+</ul>
+
+<div class="whiteboard">
+<h3>Whiteboard summary — the whole track, one system</h3>
+<p>RepoSage = router → {code, history, docs agents} → synthesizer → critic (bounded self-correct), over 3 indexes (vector+BM25, knowledge graph, multimodal), through one gateway, gated by a golden eval set.<br>
+Differentiator: answers "why" by fusing code + git + docs, and shows its self-correction.<br>
+Every chapter is load-bearing — which is exactly why you can defend it end to end.<br>
+Interview: 60-sec pitch · one number per layer · a failure story · owned trade-offs.</p>
+</div>
+
+<h2>You've finished the track</h2>
+<p>Twelve chapters, from the dot product to a deployed multi-agent RAG system. If you did the labs and built RepoSage, you can now derive attention on a whiteboard, diagnose a RAG failure to its stage, implement an agent loop from scratch, and defend every decision with numbers — which is precisely what a MAANG-level AI engineering interview is testing. Go build it, then teach it to someone else: the fastest way to prove you own this material is to explain it as clearly as these chapters tried to.</p>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://tree-sitter.github.io/tree-sitter/">tree-sitter</a> · <a href="https://github.com/microsoft/graphrag">Microsoft GraphRAG</a> · <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a></li>
+<li><a href="../curriculum/LLM_RAG_Curriculum.html">The original syllabus</a> (resource lists per milestone) · <a href="../labs/README.md">All labs</a></li>
+</ul>
+
+<div class="ch-nav">
+<a href="11-production.html">← Ch 11: Production</a>
+<a href="../home.html">Track home ⌂</a>
+</div>
+</main>
+</body>
+</html>

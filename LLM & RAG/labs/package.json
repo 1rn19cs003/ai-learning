@@ -1,0 +1,20 @@
+{
+  "name": "llm-rag-labs",
+  "version": "1.0.0",
+  "description": "Runnable TypeScript labs for the LLM & RAG track",
+  "type": "module",
+  "scripts": {
+    "lab01": "tsx 01-math/solution.ts",
+    "lab02": "tsx 02-bpe/solution.ts",
+    "lab03": "tsx 03-attention/solution.ts",
+    "lab04": "tsx 04-lora-math/solution.ts",
+    "test": "vitest run"
+  },
+  "keywords": ["llm", "rag", "learning"],
+  "license": "MIT",
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

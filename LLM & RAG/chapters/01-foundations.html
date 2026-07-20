@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 1 · The math that runs everything — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html" class="current">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 1.</span> The math that runs everything</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/01-math</code> · Prerequisite: comfortable with any programming language</p>
+
+<p>Every impressive thing an LLM does reduces to four mathematical operations repeated billions of times: <b>dot products</b> (measuring similarity), <b>matrix multiplications</b> (transforming representations), <b>softmax</b> (turning scores into probabilities), and <b>gradient descent</b> (learning from mistakes). Master these four with real intuition — not just formulas — and nothing in the next eleven chapters will feel like magic. This chapter builds each one from zero, then trains a tiny neural network by hand so you feel backpropagation in your fingers.</p>
+
+<h2 id="vectors">1.1 Vectors: meaning as position</h2>
+
+<div class="def">A <b>vector</b> is an ordered list of numbers, interpreted as a point (or arrow) in space. In LLMs, every token, every intermediate representation, and every "thought" is a vector — typically 768 to 16,384 numbers long.</div>
+
+<p>Why lists of numbers? Because <b>similarity becomes geometry</b>. If "dog" and "puppy" are both points in a 1,536-dimensional space, and the training process pushed related concepts near each other, then "how similar are these words?" becomes "how close are these points?" — a question with an exact, fast, computable answer.</p>
+
+<h3 id="dot">The dot product — the single most executed operation in AI</h3>
+
+<div class="math">a · b = a₁b₁ + a₂b₂ + … + aₙbₙ</div>
+
+<p>Multiply matching positions, add everything up, get one number. Geometrically: <span class="math" style="display:inline">a · b = |a| |b| cos θ</span> — the product of the lengths times the cosine of the angle between them. Large positive → pointing the same way. Zero → perpendicular (unrelated). Negative → opposing.</p>
+
+<div class="worked">
+Let a = [2, 1, 0] and b = [1, 3, 0].<br>
+a · b = (2)(1) + (1)(3) + (0)(0) = <b>5</b>.<br>
+|a| = √(4+1+0) = √5 ≈ 2.236 &nbsp;&nbsp; |b| = √(1+9+0) = √10 ≈ 3.162<br>
+cos θ = 5 / (2.236 × 3.162) = 5 / 7.071 ≈ <b>0.707</b> → θ = 45°.<br>
+The vectors are moderately aligned — and you just computed your first similarity score.
+</div>
+
+<h3 id="cosine">Cosine similarity — normalizing away magnitude</h3>
+
+<div class="math">cos(a, b) = (a · b) / (|a| |b|) &nbsp;&nbsp; ∈ [−1, 1]</div>
+
+<p>Why divide by the lengths? Because in embedding spaces, <b>direction encodes meaning; length often encodes artifacts</b> (word frequency, sentence length). A 2,000-word document about dogs and a 20-word note about dogs should be "similar" — cosine makes them so; raw dot product would let the longer document dominate.</p>
+
+<div class="misconception">"Cosine similarity and dot product are different algorithms with different results." — Not when vectors are <b>normalized to length 1</b> (as most embedding APIs do, including OpenAI's). Then |a| = |b| = 1, so cosine = dot product exactly. This is why vector databases often default to dot product: it's cosine, minus two divisions. In an interview, saying "we normalize at index time so dot product IS cosine" signals you actually understand the geometry.</div>
+
+<h2 id="matrices">1.2 Matrices: machines that transform meaning</h2>
+
+<div class="def">A <b>matrix</b> is a grid of numbers. Multiplying a vector by a matrix produces a new vector: each output element is a dot product between the input and one <b>row</b> of the matrix. A matrix is therefore a bundle of learned "questions" — each row asks the input one dot-product question, and the output vector is the list of answers.</div>
+
+<p>This reframing matters enormously for the transformer chapter: when you see <code>Q = W_q · x</code>, read it as "the matrix W<sub>q</sub> asks the token vector x a battery of questions, producing its Query vector." A neural network layer is exactly <code>output = activation(W · input + b)</code> — one transformation, one nudge (bias), one nonlinearity.</p>
+
+<div class="intuition">Think of a matrix as a machine that <b>moves every point in space simultaneously</b> — rotating, stretching, projecting. Deep learning = stacking many such machines and letting gradient descent tune what each one does. "Deep" just means "many transformations composed."</div>
+
+<h2 id="softmax">1.3 Softmax: from scores to probabilities</h2>
+
+<p>After all its layers, an LLM produces one raw score (a <b>logit</b>) per vocabulary token — say 100,000 numbers like <code>[2.1, −0.3, 5.7, …]</code>. To pick the next token we need probabilities: non-negative, summing to 1. Softmax does this:</p>
+
+<div class="math">softmax(zᵢ) = e^(zᵢ) / Σⱼ e^(zⱼ)</div>
+
+<div class="worked">
+Logits for three candidate tokens: z = [2, 1, 0].<br>
+e² = 7.389, e¹ = 2.718, e⁰ = 1.000 → sum = 11.107<br>
+P = [7.389/11.107, 2.718/11.107, 1/11.107] = <b>[0.665, 0.245, 0.090]</b><br><br>
+Now apply <b>temperature T = 2</b> (divide logits by T before softmax): z/T = [1, 0.5, 0]<br>
+e¹=2.718, e^0.5=1.649, e⁰=1 → sum = 5.367 → P = <b>[0.506, 0.307, 0.186]</b><br>
+Same ranking, flatter distribution. And with T → 0: P → [1, 0, 0] — greedy.
+<b>That's all temperature is:</b> a divisor on logits that sharpens (T&lt;1) or flattens (T&gt;1) the distribution.
+</div>
+
+<p>Two production-relevant details interviewers love:</p>
+<ul>
+<li><b>Numerical stability:</b> e^1000 overflows. Every real implementation subtracts max(z) from all logits first — mathematically identical (it cancels in the ratio), numerically safe. Writing softmax without this is a classic screening-question trap.</li>
+<li><b>Why e and not something else?</b> Exponentials make the log-likelihood loss mathematically clean (the gradient of softmax + cross-entropy is beautifully simple: <code>P − y</code>), and they guarantee strict positivity while exaggerating differences — a "soft" version of argmax, hence the name.</li>
+</ul>
+
+<h2 id="loss">1.4 Cross-entropy: measuring wrongness</h2>
+
+<div class="def"><b>Cross-entropy loss</b> for next-token prediction is simply: <b>−log(probability the model gave to the correct token)</b>. Model said 0.665 for the right answer → loss = −log(0.665) = 0.408. Model said 0.001 → loss = 6.9. Perfect confidence → loss = 0.</div>
+
+<p>Why not mean-squared error? Two reasons that make a strong interview answer: (1) with softmax outputs, cross-entropy yields the clean gradient <code>P − y</code> while MSE's gradient contains a term that vanishes exactly when the model is confidently wrong — the worst time to stop learning; (2) −log punishes confident mistakes brutally (asymptotically infinite), which is the correct incentive for a probability model. When you see "the model achieved a loss of 2.1," that means on average it assigned e^(−2.1) ≈ 12% probability to each correct next token — and <b>perplexity</b> is just e^loss ≈ 8.2, "as confused as choosing among 8 equally likely options."</p>
+
+<h2 id="gradients">1.5 Gradients and the chain rule: the learning signal</h2>
+
+<div class="def">The <b>gradient</b> of the loss with respect to a parameter answers: "if I nudge this parameter up by a tiny amount, does the loss go up or down, and how fast?" Collect that answer for all parameters and you have a direction — step the opposite way (<b>gradient descent</b>), and the loss decreases.</div>
+
+<div class="math">w ← w − η · ∂L/∂w &nbsp;&nbsp;&nbsp;(η = learning rate)</div>
+
+<p>The <b>chain rule</b> is how we compute gradients through composed functions: if L depends on y, and y depends on w, then ∂L/∂w = ∂L/∂y · ∂y/∂w. A neural network is a giant composition — so the gradient at any weight is a <b>product of local derivatives along the path from that weight to the loss</b>. Backpropagation is nothing more than computing these products efficiently, back to front, reusing shared subpaths. It is bookkeeping, not magic.</p>
+
+<div class="worked">
+<b>Train a 2-parameter "network" by hand.</b> Model: ŷ = w·x + b. Data point: x = 2, target y = 10. Start: w = 1, b = 0, learning rate η = 0.1. Loss = (ŷ − y)².<br><br>
+<b>Forward:</b> ŷ = 1·2 + 0 = 2. Loss = (2 − 10)² = 64.<br>
+<b>Backward (chain rule):</b> ∂L/∂ŷ = 2(ŷ − y) = 2(−8) = −16.<br>
+∂ŷ/∂w = x = 2 → ∂L/∂w = −16 × 2 = <b>−32</b>. &nbsp; ∂ŷ/∂b = 1 → ∂L/∂b = <b>−16</b>.<br>
+<b>Update:</b> w = 1 − 0.1(−32) = <b>4.2</b>. &nbsp; b = 0 − 0.1(−16) = <b>1.6</b>.<br>
+<b>Forward again:</b> ŷ = 4.2·2 + 1.6 = 10.0. Loss ≈ 0. One step, huge improvement (toy-sized, but the mechanism is identical at 70B parameters).
+</div>
+
+<div class="misconception">"Backprop is how the model learns." — Backprop only computes gradients. <b>The optimizer</b> (SGD, Adam) does the learning by applying updates. Adam, used by essentially all LLM training, adapts a per-parameter learning rate using running averages of the gradient (momentum) and its square (scale) — this is why it converges where plain SGD struggles on transformers. Knowing this distinction is a reliable interview differentiator.</div>
+
+<h3 id="autograd">Autograd in 40 lines — the heart of PyTorch</h3>
+<p class="code-label">TypeScript — the essential mechanism of every deep-learning framework (full version in the lab)</p>
+<pre><code><span class="kw">class</span> <span class="fn">Value</span> {
+  grad = <span class="nu">0</span>;
+  <span class="kw">private</span> backward_: () =&gt; <span class="kw">void</span> = () =&gt; {};
+  <span class="kw">constructor</span>(<span class="kw">public</span> data: <span class="kw">number</span>, <span class="kw">private</span> parents: Value[] = []) {}
+
+  <span class="fn">add</span>(o: Value): Value {
+    <span class="kw">const</span> out = <span class="kw">new</span> <span class="fn">Value</span>(<span class="kw">this</span>.data + o.data, [<span class="kw">this</span>, o]);
+    out.backward_ = () =&gt; {          <span class="cm">// d(a+b)/da = 1, d(a+b)/db = 1</span>
+      <span class="kw">this</span>.grad += out.grad;         <span class="cm">// += because a node can feed many paths</span>
+      o.grad += out.grad;
+    };
+    <span class="kw">return</span> out;
+  }
+  <span class="fn">mul</span>(o: Value): Value {
+    <span class="kw">const</span> out = <span class="kw">new</span> <span class="fn">Value</span>(<span class="kw">this</span>.data * o.data, [<span class="kw">this</span>, o]);
+    out.backward_ = () =&gt; {          <span class="cm">// d(a·b)/da = b  — the chain rule, locally</span>
+      <span class="kw">this</span>.grad += o.data * out.grad;
+      o.grad += <span class="kw">this</span>.data * out.grad;
+    };
+    <span class="kw">return</span> out;
+  }
+  <span class="fn">backward</span>() {                      <span class="cm">// topological sort, then chain rule in reverse</span>
+    <span class="kw">const</span> topo: Value[] = []; <span class="kw">const</span> seen = <span class="kw">new</span> <span class="fn">Set</span>&lt;Value&gt;();
+    <span class="kw">const</span> <span class="fn">build</span> = (v: Value) =&gt; { <span class="kw">if</span> (!seen.has(v)) { seen.add(v);
+      v.parents.forEach(build); topo.push(v); } };
+    <span class="fn">build</span>(<span class="kw">this</span>);
+    <span class="kw">this</span>.grad = <span class="nu">1</span>;                  <span class="cm">// dL/dL = 1</span>
+    <span class="kw">for</span> (<span class="kw">const</span> v <span class="kw">of</span> topo.reverse()) v.backward_();
+  }
+}</code></pre>
+<p>That <code>+=</code> in the backward closures is the chain rule's sum-over-paths; the reversed topological order guarantees every node's gradient is complete before it propagates further back. PyTorch is this idea, industrialized.</p>
+
+<div class="lab-link">🧪 <b>Lab 01:</b> <code>labs/01-math/</code> — implement dot, cosine, softmax (with the max-subtraction trick), and this autograd class; train the 2-parameter model; assertions verify every step. <code>npm run lab01</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Why does everyone use cosine similarity for embeddings instead of Euclidean distance?</p>
+<p class="ia">Embedding direction encodes semantics while magnitude often encodes nuisance factors (frequency, length). Cosine ignores magnitude. Also, on normalized vectors, cosine, dot product, and Euclidean distance produce identical rankings (monotonically related) — so we normalize once and use dot product for speed. Bonus: name that ranking equivalence — it shows real understanding rather than recipe-following.</p>
+<p class="iq">What breaks if you implement softmax exactly from its formula?</p>
+<p class="ia">Overflow: e^z explodes for logits above ~700 (float64). Fix: subtract max(z) from all logits first — the result is mathematically unchanged because the factor e^(−max) cancels in numerator and denominator. This is the standard "do they actually write numerical code" screen.</p>
+<p class="iq">Why cross-entropy rather than MSE for classification/next-token prediction?</p>
+<p class="ia">Combined with softmax it gives gradient (P − y): large when confidently wrong, never saturating. MSE through a softmax/sigmoid has a derivative factor that goes to zero precisely when the model is confidently wrong, so learning stalls. Also cross-entropy is the maximum-likelihood objective for a categorical distribution — it's not an arbitrary choice.</p>
+<p class="iq">What's the difference between backpropagation and gradient descent?</p>
+<p class="ia">Backprop computes ∂L/∂w for every weight via the chain rule (reverse-mode automatic differentiation — one backward pass costs about the same as one forward pass regardless of parameter count, which is why training giant nets is feasible at all). Gradient descent (or Adam) then uses those gradients to update weights. Separate algorithms, often conflated.</p>
+<p class="iq">A training run's loss is 2.0. What does that number mean, concretely?</p>
+<p class="ia">Cross-entropy 2.0 nats → the model assigns on average e^(−2.0) ≈ 13.5% probability to the true next token; perplexity e² ≈ 7.4, i.e., "as uncertain as a fair choice among ~7 tokens." Being able to translate loss into perplexity into plain English is a strong signal.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary — reproduce this from memory before moving on</h3>
+<p><code>a·b = Σaᵢbᵢ = |a||b|cosθ</code> — similarity is geometry. Normalize → cosine ≡ dot.<br>
+Matrix row = a learned dot-product question; layer = <code>act(Wx + b)</code>.<br>
+<code>softmax(z)ᵢ = e^zᵢ/Σe^zⱼ</code> — subtract max first; temperature divides logits.<br>
+Loss = <code>−log P(correct)</code>; perplexity = <code>e^loss</code>.<br>
+Backprop = chain rule + topological order + gradient accumulation; optimizer applies updates.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://www.3blue1brown.com/topics/linear-algebra">3Blue1Brown — Essence of Linear Algebra</a> (the visual intuition this chapter compresses)</li>
+<li><a href="https://www.youtube.com/watch?v=VMj-3S1tku0">Karpathy — micrograd, spelled out</a> (2.5 hrs; our Value class, built live in Python)</li>
+<li><a href="https://mml-book.github.io/">Mathematics for Machine Learning</a> (free book — reference, not cover-to-cover)</li>
+</ul>
+
+<div class="ch-nav">
+<a href="../home.html">← Track home</a>
+<a href="02-tokens-embeddings.html">Chapter 2: Tokens &amp; embeddings →</a>
+</div>
+</main>
+</body>
+</html>

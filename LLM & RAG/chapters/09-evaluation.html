@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 9 · Evaluation — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html" class="current">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 9.</span> Evaluation: stop trusting vibes</h1>
+<p class="reading-meta">~35 min read · Lab: <code>labs/09-eval</code> · What separates demos from products</p>
+
+<p>Anyone can build a RAG demo that looks great on five hand-picked questions. Shipping a reliable system requires <b>measuring</b> quality — systematically, reproducibly, and automatically on every change. This is the skill that most distinguishes senior LLM engineers, and it comes up in nearly every serious interview: "how do you know it works?"</p>
+
+<h2 id="triad">9.1 The RAG triad</h2>
+<p>TruLens framed RAG quality as three questions, each isolating a different failure point:</p>
+<table>
+<tr><th>Metric</th><th>Question</th><th>Catches</th></tr>
+<tr><td><b>Context relevance</b></td><td>Did retrieval fetch the right passages?</td><td>Retrieval failures (chunking, embedding, query)</td></tr>
+<tr><td><b>Groundedness / faithfulness</b></td><td>Is every claim in the answer supported by the retrieved context?</td><td>Hallucination — the answer went beyond its evidence</td></tr>
+<tr><td><b>Answer relevance</b></td><td>Does the answer actually address the question?</td><td>On-topic-but-useless answers</td></tr>
+</table>
+<div class="intuition">Grading a student's open-book essay: did they open the right pages (context relevance)? did they represent those pages accurately (groundedness)? did they answer the actual question (answer relevance)? A fluent essay built from the wrong pages, or one that invents facts not on the pages it cited, fails — even though it "sounds" right. These three catch different failures, so you need all three.</div>
+
+<h2 id="ragas">9.2 Ragas metrics and how they're computed</h2>
+<p>Ragas operationalizes these with LLM-as-judge. The formulas are worth knowing:</p>
+<ul>
+<li><b>Faithfulness</b> = (claims in the answer supported by the context) / (total claims in the answer). The judge decomposes the answer into atomic claims, then checks each against the retrieved context. 0.8 means 1 in 5 claims is unsupported.</li>
+<li><b>Answer relevancy</b> ≈ average cosine similarity between the original question and several questions an LLM generates <i>from the answer</i> — if the answer implies your question, it was relevant.</li>
+<li><b>Context precision</b> = of the retrieved chunks, how many were actually useful, weighted toward the top ranks (are the good chunks ranked high?).</li>
+<li><b>Context recall</b> = of the facts needed to answer (from a reference answer), how many appear in the retrieved context. Low recall = retrieval missed necessary information.</li>
+</ul>
+
+<div class="misconception">"LLM-as-judge is objective because it's a model." — LLM judges have real, documented biases: they prefer longer answers, favor outputs from their own model family, are sensitive to position/ordering in pairwise comparisons, and can be swayed by confident tone over correctness. Mitigate: use a strong judge model, give it a precise rubric with examples, use pairwise comparison over absolute scoring where possible, randomize positions, and — critically — <b>spot-check judge decisions against human labels</b> on a sample. Never treat a judge score as ground truth without validating the judge itself. Saying this unprompted signals maturity.</div>
+
+<h2 id="golden">9.3 Golden datasets — your source of truth</h2>
+<p>A <b>golden set</b> is 30–100 question/answer pairs you (or domain experts) verified by hand for a representative slice of your corpus. It's the reference every automated metric is scored against. Build it deliberately:</p>
+<ul>
+<li>Seed it from <b>real failures</b> (your Chapter 7 <code>failures.json</code>) plus real user questions — not questions you know it can answer.</li>
+<li>Cover the hard categories: multi-hop, "not in the corpus" (to test abstention), ambiguous, exact-term.</li>
+<li>Version it in git like code. When it grows, you're building an asset competitors can't easily copy.</li>
+<li><b>Synthetic generation</b> (have an LLM draft Q&amp;A from your docs) bootstraps volume, but a human must curate — ungated synthetic sets measure the generator's biases, not your system.</li>
+</ul>
+
+<h2 id="ci">9.4 Evaluation as CI — the mindset shift</h2>
+<p>The leap from hobbyist to professional: treat prompts, chunk sizes, and retrieval configs like code, and gate changes on evals. Every PR runs the golden set; if faithfulness drops below threshold, the build fails — exactly like a failing unit test. This is what makes iteration safe: you can try HyDE, a new reranker, a different chunk size, and know within minutes whether it helped or regressed, per metric.</p>
+
+<p class="code-label">promptfoo config — evals that fail CI (conceptual)</p>
+<pre><code><span class="cm"># promptfooconfig.yaml</span>
+prompts: [<span class="st">file://rag-prompt.txt</span>]
+providers: [<span class="st">file://ragPipeline.ts</span>]        <span class="cm"># your whole pipeline as the "model"</span>
+tests: <span class="st">file://golden-set.yaml</span>              <span class="cm"># the 30+ verified Q&amp;A pairs</span>
+defaultTest:
+  assert:
+    - type: <span class="st">context-faithfulness</span>          <span class="cm"># LLM-judge: claims supported by context?</span>
+      threshold: <span class="nu">0.9</span>                       <span class="cm"># build FAILS below this</span>
+    - type: <span class="st">answer-relevance</span>
+      threshold: <span class="nu">0.8</span>
+    - type: <span class="st">latency</span>
+      threshold: <span class="nu">3000</span>                      <span class="cm"># ms — quality AND speed are gated</span></code></pre>
+
+<h2 id="tracing">9.5 Tracing and observability</h2>
+<p>Metrics tell you <i>that</i> something regressed; <b>tracing</b> tells you <i>where</i>. Tools like Langfuse or LangSmith record a span for every stage of every query — query rewrite, each retrieval, rerank scores, the final generation — with inputs, outputs, latency, and cost. When an answer is wrong, you open its trace and see whether retrieval missed the chunk (retrieval bug) or had it and the model ignored it (generation bug) — the retrieve-vs-generate split from Chapter 7, made mechanical. In production, tracing plus your eval set becomes a monitoring canary: run the golden set on a schedule against prod and alert on score drops (a model-provider update or a corrupted index shows up immediately).</p>
+
+<div class="lab-link">🧪 <b>Lab 09:</b> <code>labs/09-eval/</code> — turn your <code>failures.json</code> + 20 new pairs into a golden set, implement faithfulness and answer-relevance judges, wire an <code>npm run eval</code> that fails below thresholds, and produce a naive-vs-advanced RAG comparison chart. <code>npm run lab09</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">How do you evaluate a RAG system?</p>
+<p class="ia">Separate retrieval and generation quality. Retrieval: context precision/recall against a golden set (are the needed chunks retrieved and ranked high?). Generation: faithfulness (claims supported by context — the anti-hallucination metric) and answer relevance. Score with LLM-as-judge but validate the judge against human labels. Wrap it as CI so every change is gated, and trace every stage so failures are localizable. The headline: build a versioned golden set from real failures and never ship a change that regresses it.</p>
+<p class="iq">What's the most important RAG metric and why?</p>
+<p class="ia">Faithfulness/groundedness, usually — because a confidently wrong, unsupported answer is worse than "I don't know": it destroys user trust and can cause real harm in domains like legal/medical/finance. It directly measures hallucination, the failure mode RAG exists to prevent. That said, faithfulness alone can be gamed by a system that only ever says "not in the docs," so it must be paired with answer relevance and context recall. The right answer names faithfulness AND why it can't stand alone.</p>
+<p class="iq">What are the pitfalls of LLM-as-judge?</p>
+<p class="ia">Length bias (prefers verbose answers), self-preference (favors its own model family), position bias in pairwise comparisons, and susceptibility to confident tone over correctness. Mitigations: strong judge + explicit rubric with examples, pairwise over absolute where possible, randomized positions, and spot-checking judge outputs against human labels to measure the judge's own accuracy. Treating the judge as infallible is the mistake.</p>
+<p class="iq">How would you catch a production regression from a model-provider update?</p>
+<p class="ia">Run the golden eval set on a schedule against production (a canary), track metric trends over time in your tracing/eval dashboard, and alert on statistically meaningful drops in faithfulness/relevance/latency. Because the eval is automated and versioned, a silent provider change or index corruption surfaces as a metric dip rather than as user complaints. Same philosophy as monitoring + synthetic checks in classic SRE.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>RAG triad: context relevance (retrieval), groundedness/faithfulness (no hallucination), answer relevance (on-target).<br>
+Ragas: faithfulness = supported claims / all claims; context precision (good chunks ranked high) &amp; recall (needed facts retrieved).<br>
+LLM-judge is biased (length, self-preference, position) → validate against humans.<br>
+Golden set = 30–100 hand-verified pairs from real failures; versioned in git; synthetic needs curation.<br>
+Evals as CI: gate every change; trace every stage → localize retrieve vs generate; golden set on a timer = prod canary.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://docs.ragas.io/en/stable/">Ragas docs</a> (metric math on the concepts pages) · <a href="https://www.trulens.org/">TruLens</a> (the RAG triad)</li>
+<li><a href="https://www.promptfoo.dev/docs/intro/">promptfoo</a> (TS-native eval/CI) · <a href="https://langfuse.com/docs">Langfuse</a> (tracing, JS SDK)</li>
+<li><a href="https://arxiv.org/abs/2306.05685">Judging LLM-as-a-Judge (2023)</a> — the biases, measured</li>
+</ul>
+
+<div class="ch-nav">
+<a href="08-advanced-rag.html">← Ch 8: Advanced RAG</a>
+<a href="10-agents.html">Chapter 10: Agents &amp; orchestration →</a>
+</div>
+</main>
+</body>
+</html>

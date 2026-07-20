@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 8 · Advanced RAG — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html" class="current">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 8.</span> Advanced RAG: fixing every failure</h1>
+<p class="reading-meta">~55 min read · Lab: <code>labs/08-advanced-rag</code> · The longest, most valuable chapter</p>
+
+<p>Each technique here targets a specific failure from Chapter 7's taxonomy. Add them in order, measure after each, keep what earns its complexity. We'll compute BM25 and Reciprocal Rank Fusion by hand (interviewers ask), then cover query transformation, cross-encoder reranking, contextual retrieval, Graph RAG, and self-correcting loops.</p>
+
+<h2 id="hybrid">8.1 Hybrid search: BM25 + vectors</h2>
+<p><b>Fixes:</b> vocabulary mismatch, exact-term retrieval (IDs, function names, error codes). Dense vectors capture meaning but can miss exact tokens; BM25 (keyword) nails exact terms but misses paraphrases. Run both, fuse the results — the combination reliably beats either alone.</p>
+
+<h3 id="bm25">BM25, demystified</h3>
+<p>BM25 scores a document for a query term using three intuitions: rarer terms matter more (IDF), more occurrences help but with <b>diminishing returns</b> (saturation), and long documents get a mild penalty (they contain more words by chance).</p>
+<div class="math">score(D,q) = Σ IDF(qᵢ) · [ f(qᵢ,D)·(k₁+1) ] / [ f(qᵢ,D) + k₁·(1 − b + b·|D|/avgdl) ]</div>
+<div class="worked">
+Term "refund", corpus of 1000 docs, "refund" appears in 10 → IDF ≈ ln((1000−10+0.5)/(10+0.5)) ≈ ln(94.3) ≈ <b>4.55</b>.<br>
+Doc D: "refund" occurs f=3 times, |D|=120 words, avgdl=100, params k₁=1.5, b=0.75.<br>
+Length norm: 1 − b + b·|D|/avgdl = 1 − 0.75 + 0.75·(120/100) = 0.25 + 0.9 = 1.15<br>
+Saturation term: (3·2.5) / (3 + 1.5·1.15) = 7.5 / 4.725 = <b>1.587</b><br>
+Score contribution = 4.55 × 1.587 ≈ <b>7.22</b>.<br>
+Note the saturation: going from f=3 to f=6 does NOT double the score — that's the "diminishing returns" that stops keyword-stuffed docs from dominating, BM25's key advantage over raw TF-IDF.
+</div>
+
+<h3 id="rrf">Reciprocal Rank Fusion — merging two ranked lists</h3>
+<p>Dense and BM25 produce scores on incomparable scales, so we fuse by <b>rank</b>, not score. RRF gives each document points based on its position in each list:</p>
+<div class="math">RRF(d) = Σ<sub>lists</sub> 1 / (k + rank<sub>list</sub>(d)) &nbsp;&nbsp; (k ≈ 60 by convention)</div>
+<div class="worked">
+Doc X: rank 1 in vector search, rank 5 in BM25. Doc Y: rank 2 in both.<br>
+RRF(X) = 1/(60+1) + 1/(60+5) = 0.01639 + 0.01538 = <b>0.03177</b><br>
+RRF(Y) = 1/(60+2) + 1/(60+2) = 0.01613 + 0.01613 = <b>0.03226</b><br>
+Y edges out X — being solidly good in <i>both</i> lists beats being #1 in one and mediocre in the other. That robustness, with no score calibration and one tiny constant, is why RRF is the industry default fusion method.
+</div>
+
+<h2 id="query">8.2 Query transformation: fix the question before searching</h2>
+<p><b>Fixes:</b> vague queries, multi-hop, vocabulary gaps.</p>
+<ul>
+<li><b>Query rewriting:</b> an LLM cleans a messy query ("it's broken" → "why does the checkout API return HTTP 500?"). Cheap, high ROI.</li>
+<li><b>Multi-query expansion:</b> generate 3–4 phrasings, retrieve for each, union the results — covers vocabulary variance.</li>
+<li><b>HyDE (Hypothetical Document Embeddings):</b> ask the LLM to <i>write a fake answer</i>, embed THAT, and search with it. Counterintuitive but effective: a hypothetical answer looks more like the real document (same vocabulary, same form) than the terse question does, so it lands closer in embedding space.</li>
+<li><b>Decomposition:</b> break a multi-hop question into sub-questions, retrieve for each, then synthesize. This is how you answer "which team owns the service that calls X" — find the caller, then find its owner.</li>
+<li><b>Step-back prompting:</b> ask a more general question first to retrieve foundational context, then the specific one.</li>
+</ul>
+
+<h2 id="rerank">8.3 Two-stage retrieval: reranking with cross-encoders</h2>
+<p><b>Fixes:</b> low precision, lost-in-the-middle.</p>
+<div class="def">A <b>bi-encoder</b> (your embedding model) encodes query and document <i>separately</i> — fast, precomputable, but the two never "see" each other. A <b>cross-encoder</b> feeds query + document <i>together</i> through a transformer, so full cross-attention judges relevance — far more accurate, but too slow to run over the whole corpus.</div>
+<p>So: stage 1 (bi-encoder, hybrid) retrieves ~50 candidates fast; stage 2 (cross-encoder) rescores those 50 and keeps the top 5. You get bi-encoder speed with near cross-encoder precision — and putting only the best 5, best-ordered, into the prompt directly counters lost-in-the-middle.</p>
+<div class="intuition">Bi-encoder = judging 50 books by their covers (fast, approximate). Cross-encoder = a professor actually reading each of the 50 and ranking them (slow, accurate). You'd never read the whole library, but reading a 50-book shortlist is very doable — that's why two stages, not one.</div>
+
+<h2 id="contextual">8.4 Contextual retrieval — the biggest simple win</h2>
+<p><b>Fixes:</b> chunk-boundary context loss, ambiguous chunks. Problem: a chunk reading "Revenue grew 3% that quarter" is useless without knowing <i>which company, which quarter</i>. Fix (Anthropic, 2024): at index time, have a cheap LLM prepend 1–2 sentences of situating context to each chunk ("From Acme's Q2 2024 earnings report, revenue section:") <i>before</i> embedding. Anthropic reported retrieval-failure reductions of ~35–50% — a large gain for a simple, one-time preprocessing step. It pairs especially well with hybrid search.</p>
+
+<h2 id="graph">8.5 Graph RAG — for relationships and global questions</h2>
+<p><b>Fixes:</b> multi-hop, "how are X and Y connected", corpus-wide summarization. Standard RAG retrieves isolated passages, so it can't answer questions requiring the <i>connections</i> between facts. Graph RAG (Microsoft, 2024): at index time, extract <b>entities and relationships</b> into a knowledge graph, cluster it into communities, and pre-summarize each community. At query time, traverse the graph and/or use community summaries.</p>
+<ul>
+<li><b>Local questions</b> ("what does function X call?") → walk the graph from node X.</li>
+<li><b>Global questions</b> ("what are the main themes across all these documents?") → aggregate community summaries — something no top-k passage retrieval can do, because the answer isn't in any single passage.</li>
+</ul>
+<p>Cost: entity/relation extraction over the whole corpus is LLM-heavy and slower to index. Use Graph RAG when relationship and global questions are core to your product (RepoSage's "why" and "who owns what" questions are exactly this), not as a default.</p>
+
+<h2 id="selfcorrect">8.6 Self-correcting RAG — CRAG and Self-RAG</h2>
+<p><b>Fixes:</b> hallucination on retrieval gaps, low-quality retrievals slipping through.</p>
+<div class="diagram">
+<svg viewBox="0 0 740 160" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a8" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
+  <rect x="10" y="30" width="110" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="65" y="56" text-anchor="middle" font-weight="bold">Retrieve</text>
+  <rect x="180" y="30" width="140" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="250" y="50" text-anchor="middle" font-weight="bold">Grade retrieval</text><text x="250" y="66" text-anchor="middle" fill="#6B6862">relevant &amp; sufficient?</text>
+  <rect x="390" y="30" width="120" height="44" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="450" y="56" text-anchor="middle" font-weight="bold">Generate ✓</text>
+  <rect x="180" y="104" width="230" height="40" rx="8" fill="#fff" stroke="#6B3FA0" stroke-dasharray="5,4"/><text x="295" y="128" text-anchor="middle" fill="#6B3FA0">rewrite query / web-search fallback</text>
+  <line x1="120" y1="52" x2="176" y2="52" stroke="#8A867C" stroke-width="2" marker-end="url(#a8)"/>
+  <line x1="320" y1="52" x2="386" y2="52" stroke="#8A867C" stroke-width="2" marker-end="url(#a8)"/><text x="353" y="44" text-anchor="middle" fill="#2E6B2E">good</text>
+  <line x1="250" y1="74" x2="250" y2="100" stroke="#6B3FA0" stroke-width="2" marker-end="url(#a8)"/><text x="270" y="92" fill="#6B3FA0">weak</text>
+  <path d="M180,124 C90,124 65,90 65,78" stroke="#6B3FA0" stroke-width="1.5" fill="none" marker-end="url(#a8)"/>
+  <text x="560" y="52" fill="#6B6862">CRAG: grade retrieval, retry/fallback</text>
+  <text x="560" y="72" fill="#6B6862">Self-RAG: model critiques its own</text>
+  <text x="560" y="90" fill="#6B6862">answer for groundedness</text>
+  <text x="560" y="120" fill="#C15F3C" font-weight="bold">Always BOUND the loop</text>
+  <text x="560" y="138" fill="#6B6862">(≤2 retries, then answer honestly)</text>
+</svg>
+</div>
+<ul>
+<li><b>CRAG (Corrective RAG):</b> a lightweight grader scores retrieved chunks. If they're weak, don't proceed — rewrite the query, or fall back to web search, then retry.</li>
+<li><b>Self-RAG:</b> the model emits "reflection" signals critiquing whether its own answer is grounded in the retrieved evidence, and retrieves more if not.</li>
+</ul>
+<p>Both trade latency and cost for reliability. The universal rule: <b>bound the loop</b> (max ~2 retries) or you'll build something that spins forever burning money. This loop is the beating heart of RepoSage's critic agent (Chapter 12).</p>
+
+<h2 id="order">8.7 Putting it together — the order that works</h2>
+<p>Don't add all of this at once. When quality is short of the bar, add in this order and measure (Chapter 9) after each:</p>
+<ol>
+<li>Fix chunking (structure-aware + overlap) — often the single biggest gain</li>
+<li>Add contextual retrieval — cheap, large win</li>
+<li>Add hybrid search (BM25 + RRF) — fixes vocabulary/exact-term misses</li>
+<li>Add cross-encoder reranking — fixes precision + lost-in-the-middle</li>
+<li>Add query transformation (rewrite/HyDE/decompose) — fixes vague and multi-hop</li>
+<li>Add Graph RAG and/or self-correction — for relationship/global questions and gap-hallucination</li>
+</ol>
+
+<div class="lab-link">🧪 <b>Lab 08:</b> <code>labs/08-advanced-rag/</code> — extend Lab 07: implement BM25 + RRF (verify the hand-computed numbers), add a cross-encoder reranker and HyDE, then re-run your failure set and produce a before/after table attributing each fix to each failure. A minimal knowledge-graph build is included. <code>npm run lab08</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">What is hybrid search and why does it beat pure vector search?</p>
+<p class="ia">Run dense (semantic) and sparse (BM25 keyword) retrieval, then fuse — usually with Reciprocal Rank Fusion. Vectors capture paraphrase/meaning but miss exact tokens (product IDs, function names, rare jargon, error codes); BM25 nails exact terms but misses synonyms. Together they cover each other's blind spots. RRF fuses by rank (1/(k+rank)), avoiding the need to calibrate incomparable score scales. It's the reliable default for production RAG.</p>
+<p class="iq">Bi-encoder vs cross-encoder — when and why?</p>
+<p class="ia">Bi-encoder encodes query and doc separately, so doc vectors are precomputed and search is fast — but query and doc never interact, capping accuracy. Cross-encoder concatenates query+doc and runs full attention over both, judging relevance precisely, but can't be precomputed and is too slow over a whole corpus. So: bi-encoder for stage-1 recall (get 50 candidates), cross-encoder to rerank those 50 to a precise top-5. Best of both.</p>
+<p class="iq">Explain HyDE and why embedding a fake answer helps.</p>
+<p class="ia">Instead of embedding the question, have the LLM write a hypothetical answer and embed that. A question and its answer often share little surface form ("How do I reset?" vs "To reset, navigate to Settings…"), so the question embeds far from the real doc. A hypothetical answer mimics the doc's vocabulary and structure, landing closer in embedding space — improving retrieval even though the fake answer may be factually off, because we only use it to search, not to answer.</p>
+<p class="iq">When would you reach for Graph RAG over standard RAG?</p>
+<p class="ia">When questions depend on relationships or span the whole corpus: multi-hop ("which team owns the service that calls X"), connection queries ("how do A and B relate"), or global synthesis ("main themes across all docs") — none answerable from isolated top-k passages. Graph RAG extracts entities/relations into a graph and pre-summarizes communities. Cost is heavy index-time extraction, so use it when those question types are core, not by default.</p>
+<p class="iq">How do you keep a self-correcting RAG loop from running forever or exploding cost?</p>
+<p class="ia">Hard bound the iterations (e.g., ≤2 retries), require the grader to justify a retry with a concrete gap, cap total tokens/latency per query, and always have a terminal "answer honestly with what we have / say we couldn't find it" branch. Self-correction (CRAG/Self-RAG) improves reliability but each loop multiplies cost and latency, so the budget and the exit condition are part of the design, not an afterthought.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>Hybrid = BM25 (IDF · saturating TF · length norm) + vectors, fused by RRF (Σ 1/(60+rank)) — fuse by rank, not score.<br>
+Query transform: rewrite, multi-query, HyDE (embed a fake answer), decompose (multi-hop).<br>
+Two-stage: bi-encoder recall 50 → cross-encoder rerank to 5 (precision + beats lost-in-middle).<br>
+Contextual retrieval: LLM-prepend chunk context before embedding — cheap, ~35–50% fewer retrieval misses.<br>
+Graph RAG: entities+relations graph + community summaries → multi-hop &amp; global questions.<br>
+CRAG/Self-RAG: grade retrieval/answer, retry — ALWAYS bounded.<br>
+Add in order, measure after each. Complexity must earn its place.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2212.10496">HyDE (2022)</a> · <a href="https://arxiv.org/abs/2404.16130">GraphRAG (Microsoft, 2024)</a> · <a href="https://arxiv.org/abs/2401.15884">CRAG (2024)</a> · <a href="https://arxiv.org/abs/2310.11511">Self-RAG (2023)</a></li>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic — Contextual Retrieval</a> · <a href="https://weaviate.io/blog/hybrid-search-explained">Weaviate — Hybrid Search Explained</a></li>
+<li><a href="https://docs.cohere.com/docs/rerank">Cohere Rerank</a> · <a href="https://github.com/NirDiamant/RAG_Techniques">NirDiamant/RAG_Techniques</a> — dozens of runnable patterns</li>
+</ul>
+
+<div class="ch-nav">
+<a href="07-rag-fundamentals.html">← Ch 7: RAG fundamentals</a>
+<a href="09-evaluation.html">Chapter 9: Evaluation →</a>
+</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 4 · How models are trained — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html" class="current">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 4.</span> How models are trained: pretraining → alignment</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/04-lora-math</code> · The chapter that justifies RAG's existence</p>
+
+<p>A raw pretrained model is a brilliant autocomplete that will happily continue "What is the capital of France?" with "What is the capital of Germany?" — because it's completing a pattern of quiz questions, not answering you. Turning that into a helpful assistant takes three more stages. Understanding this pipeline tells you <b>what fine-tuning can and cannot fix</b> — the judgment that determines whether you reach for fine-tuning or RAG, the most consequential architecture decision in applied LLM work.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
+  <rect x="8" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="83" y="55" text-anchor="middle" font-weight="bold">Pretraining</text><text x="83" y="72" text-anchor="middle" fill="#6B6862">months · millions $</text><text x="83" y="87" text-anchor="middle" fill="#6B6862">→ knows everything</text>
+  <rect x="200" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="275" y="55" text-anchor="middle" font-weight="bold">SFT</text><text x="275" y="72" text-anchor="middle" fill="#6B6862">days · thousands of</text><text x="275" y="87" text-anchor="middle" fill="#6B6862">Q→A demos</text>
+  <rect x="392" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="467" y="55" text-anchor="middle" font-weight="bold">RLHF / DPO</text><text x="467" y="72" text-anchor="middle" fill="#6B6862">preference pairs</text><text x="467" y="87" text-anchor="middle" fill="#6B6862">→ taste &amp; safety</text>
+  <rect x="584" y="35" width="168" height="58" rx="10" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="668" y="55" text-anchor="middle" font-weight="bold" fill="#C15F3C">Assistant</text><text x="668" y="72" text-anchor="middle" fill="#6B6862">the model you call</text><text x="668" y="87" text-anchor="middle" fill="#6B6862">via API</text>
+  <line x1="158" y1="64" x2="196" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
+  <line x1="350" y1="64" x2="388" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
+  <line x1="542" y1="64" x2="580" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
+</svg>
+</div>
+
+<h2 id="pretraining">4.1 Pretraining: compression as intelligence</h2>
+
+<p>Objective: predict the next token over trillions of tokens of internet, books, and code. That's it. The profound part is <b>why this produces intelligence</b>: to predict the next token of a murder-mystery's final page, or the answer line of a math problem, or the closing brace of a function, the model is forced to learn grammar, world facts, arithmetic, and reasoning — because those are what reduce prediction loss. Compression and understanding turn out to be nearly the same thing. The result is a <b>base model</b>: it can complete any text but has no notion of being a helpful conversational agent.</p>
+
+<div class="misconception">"The base model is dumb until fine-tuning makes it smart." — Backwards. Essentially <b>all the knowledge and capability is installed during pretraining</b>. SFT and RLHF add almost no new knowledge — they teach <i>format and behavior</i>: "when you see a question, answer it; be helpful; refuse harmful requests." This is why fine-tuning is poor at adding facts (there's little capacity being added) and why RAG is the right tool for knowledge. Getting this right is the whole practical payoff of the chapter.</div>
+
+<h3 id="scaling">Scaling laws and the Chinchilla correction</h3>
+<p>Kaplan et al. (2020) showed loss falls as a smooth power law in parameters, data, and compute — predictable enough to forecast a model's loss before training it, which is how labs justify eight-figure runs. Hoffmann et al. (2022, "Chinchilla") corrected the recipe: for a fixed compute budget, most large models were <b>undertrained</b> — you should scale parameters and data roughly together (~20 tokens per parameter). A Chinchilla-optimal 70B model beat a 175B model trained on less data. The modern twist: for models meant to be <i>served</i> at scale (Llama, etc.), labs deliberately "overtrain" small models past compute-optimality because inference cost, not training cost, dominates a deployed model's lifetime bill.</p>
+
+<h2 id="sft">4.2 Supervised fine-tuning: learning the assistant format</h2>
+<p>Take the base model, continue training on curated <code>(instruction, ideal response)</code> pairs — tens of thousands, human-written or curated. Same next-token objective, but now the data demonstrates the behavior we want: questions get answered, instructions get followed, a consistent helpful persona emerges. After SFT you have an <b>instruction-tuned model</b> that is genuinely useful but not yet tuned for nuanced human preferences (helpfulness vs. harmlessness trade-offs, tone, refusal calibration).</p>
+
+<h2 id="rlhf">4.3 RLHF and DPO: learning human taste</h2>
+<p>Some qualities are easy to recognize but hard to demonstrate in a single "correct" answer — helpfulness, honesty, harmlessness. So we learn from <b>comparisons</b>:</p>
+<ul>
+<li><b>RLHF</b> (Reinforcement Learning from Human Feedback): humans rank pairs of model outputs → train a <b>reward model</b> to predict those preferences → optimize the LLM (via PPO) to maximize predicted reward, with a KL penalty keeping it from drifting too far from the SFT model. Powerful, but a fiddly multi-model RL pipeline.</li>
+<li><b>DPO</b> (Direct Preference Optimization, 2023): a mathematical insight shows you can skip the separate reward model and RL loop entirely — the preference data can be optimized directly with a simple classification-style loss. Same goal, dramatically simpler and more stable. Most open models now use DPO or its descendants (IPO, KTO, ORPO).</li>
+</ul>
+
+<div class="intuition">SFT is showing the model worked examples ("here's a good answer"). RLHF/DPO is giving it taste ("this answer is better than that one"). You need both: demonstrations teach the format; preferences refine the judgment that no single demonstration can capture. This is also, loosely, why models sometimes become sycophantic — preference data from humans rewards agreeable-sounding answers.</div>
+
+<h2 id="lora">4.4 LoRA: fine-tuning without the pain</h2>
+
+<div class="def"><b>LoRA (Low-Rank Adaptation)</b> freezes all original weights and learns a small low-rank update for chosen weight matrices: instead of updating W (say 4096×4096 = 16.7M params), learn two thin matrices A (4096×r) and B (r×4096) with r≈8–64, and use W + BA. Only A and B train.</div>
+
+<div class="worked">
+<b>The parameter savings, concretely.</b> One 4096×4096 matrix = 4096² = <b>16,777,216</b> trainable params if fully fine-tuned.<br>
+With LoRA rank r = 8: A is 4096×8 = 32,768 and B is 8×4096 = 32,768 → <b>65,536</b> params.<br>
+Ratio: 65,536 / 16,777,216 = <b>0.39%</b> — a 256× reduction on that matrix. Across a whole 7B model you might train ~0.1–1% of parameters, fitting fine-tuning onto a single consumer GPU. <b>QLoRA</b> adds 4-bit quantization of the frozen base weights, cutting memory further so 65B models fine-tune on one 48 GB card.<br><br>
+Why "low rank" works: the <i>adaptation</i> needed to specialize a model to a task lives in a far smaller subspace than the full weight matrix — you're nudging behavior, not rebuilding knowledge.
+</div>
+
+<h2 id="decision">4.5 The decision that matters: fine-tune or RAG?</h2>
+
+<table>
+<tr><th>Need</th><th>Right tool</th><th>Why</th></tr>
+<tr><td>Add/again-changing facts (docs, tickets, code, prices)</td><td><b>RAG</b></td><td>Pretraining installs knowledge; fine-tuning adds little capacity for new facts and can't cite sources or be updated cheaply</td></tr>
+<tr><td>Fixed output format / JSON / domain jargon / tone</td><td><b>Fine-tune (LoRA)</b></td><td>Behavior and style live in weights; a few thousand examples reshape them reliably</td></tr>
+<tr><td>Proprietary reasoning patterns / a narrow skill</td><td><b>Fine-tune</b>, sometimes + RAG</td><td>Teaches <i>how</i> to think about a domain; RAG supplies <i>what</i> to think about</td></tr>
+<tr><td>Reduce latency/cost of a long fixed prompt</td><td>Fine-tune or prompt caching</td><td>Bake repeated instructions into weights, or cache them (Ch 11)</td></tr>
+<tr><td>Need provenance, freshness, deletion (compliance)</td><td><b>RAG</b></td><td>You can show sources, re-index in minutes, and delete a document — none possible with weights</td></tr>
+</table>
+
+<p class="ia" style="margin-top:14px"><b>The one-sentence heuristic to say in an interview:</b> "Fine-tuning changes <i>how</i> the model behaves; RAG changes <i>what</i> it knows — so knowledge problems get RAG, behavior problems get fine-tuning, and many real systems use both." This chapter exists so that sentence is something you understand rather than recite.</p>
+
+<div class="lab-link">🧪 <b>Lab 04:</b> <code>labs/04-lora-math/</code> — a notebook-style TS script computing LoRA parameter counts and memory for various ranks and model sizes, plus a decision-flowchart quiz that drills fine-tune-vs-RAG on realistic scenarios. <code>npm run lab04</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">A stakeholder wants the model to "know our internal documentation." Fine-tune or RAG?</p>
+<p class="ia">RAG, almost always. Documentation is knowledge that changes, needs citations, and may need deletion for compliance — all RAG strengths and fine-tuning weaknesses. Fine-tuning would bury facts in weights with no provenance, require retraining on every doc change, and still hallucinate confidently. I'd only add light fine-tuning if they also need a specific answer format or house style. Leading with this reasoning (not just "RAG") is what they're testing.</p>
+<p class="iq">Explain LoRA and why it works.</p>
+<p class="ia">Freeze the pretrained weights; for target matrices learn a low-rank delta BA (r≈8–64) and use W+BA. Only B and A train — often &lt;1% of parameters — so fine-tuning fits on one GPU and you can hot-swap task-specific adapters. It works because task adaptation is intrinsically low-rank: you're steering existing capability, not installing new knowledge, and that steering lives in a small subspace. QLoRA additionally 4-bit-quantizes the frozen base to cut memory.</p>
+<p class="iq">What is RLHF actually optimizing, and how does DPO simplify it?</p>
+<p class="ia">RLHF trains a reward model on human preference comparisons, then uses RL (PPO) to push the LLM toward high reward while a KL term keeps it near the SFT model. DPO proves you can reparameterize this so the optimal policy is expressible directly from the preference data — collapsing reward-modeling + RL into one supervised-style loss. Same objective (match human preferences), far fewer moving parts, more stable — which is why it's now the default in open models.</p>
+<p class="iq">What did Chinchilla change about how we train models?</p>
+<p class="ia">It showed the compute-optimal frontier requires scaling data and parameters together (~20 tokens/param), revealing that GPT-3-era giants were undertrained — a smaller model on more data wins for a fixed compute budget. The practical corollary today: for models you'll serve at scale, you deliberately overtrain smaller models past compute-optimality because inference cost dominates the lifetime bill. It reframed "bigger" into "better-balanced."</p>
+<p class="iq">Why does a base model continue your question instead of answering it?</p>
+<p class="ia">Its only training objective was next-token prediction over raw text, where a question is usually followed by more text in the same style (another question, a continuation), not an answer. "Answer questions helpfully" is a behavior installed later by SFT and refined by RLHF/DPO. The knowledge to answer is already there post-pretraining — what's missing is the learned convention of the assistant role.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>Pretraining = next-token prediction at scale → installs ~all knowledge (base model = autocomplete).<br>
+Scaling laws predict loss; Chinchilla: scale data+params together (~20 tok/param); overtrain small models for cheap inference.<br>
+SFT = demonstrations → assistant format. RLHF/DPO = preference pairs → taste; DPO drops the reward model + RL loop.<br>
+LoRA: W+BA, train only B,A (rank r) → &lt;1% params, 256× fewer on a matrix; QLoRA adds 4-bit base.<br>
+<b>Fine-tune = how it behaves; RAG = what it knows.</b> Knowledge → RAG; format/style → fine-tune; often both.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2203.02155">InstructGPT (2022)</a> — the RLHF blueprint · <a href="https://arxiv.org/abs/2305.18290">DPO (2023)</a></li>
+<li><a href="https://arxiv.org/abs/2001.08361">Scaling Laws (2020)</a> · <a href="https://arxiv.org/abs/2203.15556">Chinchilla (2022)</a></li>
+<li><a href="https://arxiv.org/abs/2106.09685">LoRA (2021)</a> · <a href="https://arxiv.org/abs/2305.14314">QLoRA (2023)</a></li>
+<li><a href="https://www.youtube.com/watch?v=zjkBMFhNj_g">Karpathy — Intro to LLMs</a> (the big-picture 1-hour talk) · <a href="https://huggingface.co/learn/nlp-course">Hugging Face NLP Course</a></li>
+</ul>
+
+<div class="ch-nav">
+<a href="03-transformer.html">← Ch 3: The transformer</a>
+<a href="05-llm-engineering.html">Chapter 5: LLM engineering →</a>
+</div>
+</main>
+</body>
+</html>

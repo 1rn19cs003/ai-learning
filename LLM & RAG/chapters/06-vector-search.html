@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 6 · Vector search internals — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html" class="current">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 6.</span> Vector search internals</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/06-ann</code> · The engine under every RAG system</p>
+
+<p>RAG's retrieval step is a nearest-neighbor search over millions of embedding vectors, and it must return in milliseconds. Brute force can't. This chapter opens the black box of vector databases: why exact search fails at scale, how HNSW and IVF actually work, the recall-vs-latency dial you'll spend your career tuning, and the filtered-search trap that surprises almost everyone in production.</p>
+
+<h2 id="brute">6.1 Why exact search doesn't scale</h2>
+<p>Exact nearest-neighbor is simple: compute similarity between the query and every stored vector, sort, take the top k. For N vectors of dimension d, that's O(N·d) per query. At N = 10 million, d = 1536, that's ~15 billion multiply-adds <b>per query</b> — tens to hundreds of milliseconds even optimized, and it grows linearly with your corpus. For interactive RAG serving thousands of queries per second, this is a non-starter. We trade a little accuracy for orders-of-magnitude speed: <b>Approximate Nearest Neighbor (ANN)</b> search.</p>
+
+<div class="def"><b>ANN</b> finds vectors that are <i>almost certainly</i> among the true nearest neighbors, in sublinear time. Quality is measured by <b>recall@k</b>: of the true top-k neighbors, what fraction did we actually return? Production systems target recall@10 of 0.95–0.99 while being 10–100× faster than brute force.</p></div>
+
+<h2 id="hnsw">6.2 HNSW — the algorithm most vector DBs use</h2>
+
+<p><b>Hierarchical Navigable Small World</b> graphs power Qdrant, Weaviate, Milvus, pgvector's HNSW index, and more. The idea combines two tricks:</p>
+<ul>
+<li><b>Navigable small world graph:</b> connect each vector to its near neighbors. To search, start anywhere and greedily hop to whichever neighbor is closest to the query, repeating until no neighbor is closer. Like finding a person at a party by repeatedly asking "who here is most like the one I'm looking for?" and walking to them.</li>
+<li><b>Hierarchy:</b> build multiple layers. The top layer has very few nodes with long-range links (the "highway"); lower layers are progressively denser; the bottom has everyone (the "streets"). Search starts at the top, greedily descends, and refines — so you cross the space in a few big jumps before local refinement.</li>
+</ul>
+
+<div class="diagram">
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <text x="12" y="20" font-weight="bold">HNSW: coarse-to-fine descent</text>
+  <text x="12" y="52" fill="#6B6862">Layer 2 (highway)</text>
+  <circle cx="140" cy="46" r="7" fill="#C15F3C"/><circle cx="360" cy="46" r="7" fill="#F4F3EE" stroke="#8A867C"/><circle cx="560" cy="46" r="7" fill="#F4F3EE" stroke="#8A867C"/>
+  <line x1="140" y1="46" x2="360" y2="46" stroke="#8A867C"/><line x1="360" y1="46" x2="560" y2="46" stroke="#8A867C"/>
+  <text x="12" y="122" fill="#6B6862">Layer 1</text>
+  <circle cx="140" cy="116" r="6" fill="#C15F3C"/><circle cx="250" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="360" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="460" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="560" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/>
+  <line x1="140" y1="116" x2="250" y2="116" stroke="#8A867C"/><line x1="250" y1="116" x2="360" y2="116" stroke="#8A867C"/><line x1="360" y1="116" x2="460" y2="116" stroke="#8A867C"/><line x1="460" y1="116" x2="560" y2="116" stroke="#8A867C"/>
+  <text x="12" y="196" fill="#6B6862">Layer 0 (everyone)</text>
+  <g fill="#F4F3EE" stroke="#8A867C"><circle cx="120" cy="190" r="5"/><circle cx="180" cy="190" r="5"/><circle cx="240" cy="190" r="5"/><circle cx="300" cy="190" r="5"/><circle cx="360" cy="190" r="5"/><circle cx="420" cy="190" r="5"/><circle cx="480" cy="190" r="5"/><circle cx="540" cy="190" r="5"/><circle cx="600" cy="190" r="5"/></g>
+  <circle cx="300" cy="190" r="6" fill="#2E6B2E"/>
+  <line x1="120" y1="190" x2="600" y2="190" stroke="#8A867C"/>
+  <path d="M140,53 C140,80 140,95 140,110" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <path d="M140,122 C180,150 250,175 296,186" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <text x="640" y="190" fill="#2E6B2E" font-weight="bold">found</text>
+  <text x="360" y="228" text-anchor="middle" fill="#6B6862">Enter at top → few big hops → descend → local refine. Visits ~hundreds of nodes, not millions.</text>
+</svg>
+</div>
+
+<p>Two knobs govern the recall/latency/memory trade-off, and naming them signals hands-on experience:</p>
+<ul>
+<li><b>M</b> — links per node. Higher M = better recall, more memory, slower build. Typical 16–64.</li>
+<li><b>efConstruction / efSearch</b> — how many candidates to explore during build / query. Higher efSearch = higher recall, higher latency. This is the runtime dial you tune per query-SLA.</li>
+</ul>
+
+<h2 id="ivf">6.3 IVF and product quantization — the other family</h2>
+<p><b>IVF (Inverted File Index):</b> cluster all vectors into, say, 4,096 groups (k-means centroids). At query time, find the nearest few centroids and search only vectors in those clusters — skipping the rest. The <code>nprobe</code> parameter (how many clusters to check) is IVF's recall/speed dial. <b>Product Quantization (PQ)</b> compresses vectors by splitting each into sub-vectors and replacing each with the nearest entry from a small learned codebook — shrinking a 1536-float vector (6 KB) to tens of bytes, so billions of vectors fit in RAM, at some accuracy cost. FAISS's <code>IVF-PQ</code> is the classic billion-scale combo; HNSW dominates when memory is available and recall is paramount.</p>
+
+<div class="misconception">"Filtering by metadata (e.g., <code>team = payments</code>) just narrows the search, so it's always faster." — Often the opposite. ANN indexes are built over the <i>whole</i> graph; a restrictive filter can force the search to traverse many non-matching nodes to find enough matching ones (post-filtering), tanking recall or latency. Mature engines mitigate with filterable HNSW / pre-filtering, but you must design for it: know whether your DB filters pre- or post-search, and test recall <i>with</i> filters, not just without. This "filtered vector search" gotcha is a favorite senior-level interview probe because it separates the read-a-blog crowd from the shipped-it crowd.</div>
+
+<h2 id="dbs">6.4 Choosing a vector store</h2>
+<table>
+<tr><th>Option</th><th>Sweet spot</th><th>Watch out for</th></tr>
+<tr><td><b>pgvector</b> (Postgres)</td><td>You already run Postgres; &lt; a few million vectors; want transactions + SQL filters in one place</td><td>Scaling past ~10M needs tuning; fewer ANN knobs than dedicated engines</td></tr>
+<tr><td><b>Qdrant / Weaviate / Milvus</b></td><td>Dedicated ANN at scale, rich filtering, hybrid search built in</td><td>Another service to run and operate</td></tr>
+<tr><td><b>Pinecone</b> (managed)</td><td>Don't want to run infra; predictable serverless scaling</td><td>Cost at scale; vendor lock-in; data leaves your perimeter</td></tr>
+<tr><td><b>FAISS</b> (library)</td><td>Batch/offline, research, billion-scale with IVF-PQ, full control</td><td>It's a library, not a database — no persistence/filtering/serving out of the box</td></tr>
+</table>
+<p class="ia" style="margin-top:12px"><b>The senior answer to "which vector DB":</b> "Start with pgvector if we're already on Postgres and under a few million vectors — one less system, transactional, SQL filtering. Graduate to a dedicated engine (Qdrant/Milvus) when scale, filtered-search performance, or built-in hybrid search justify the operational cost. The embedding model choice affects quality more than the DB choice, so I'd optimize that first." Boring, correct, and exactly what they want to hear.</p>
+
+<div class="lab-link">🧪 <b>Lab 06:</b> <code>labs/06-ann/</code> — embed ~5k passages, implement brute-force cosine search, then run Qdrant (Docker) and measure recall@10 (ANN vs. exact) and latency at 5k vs. 50k vectors; then repeat <i>with</i> a metadata filter and observe the recall drop. <code>npm run lab06</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Explain HNSW to someone who knows graphs but not ANN.</p>
+<p class="ia">A multi-layer proximity graph. Bottom layer links every vector to near neighbors; higher layers are sparse subsets with long-range edges. Search starts at the top entry point and greedily walks to the neighbor closest to the query, descending layers — big jumps first (highways), fine steps last (streets). It visits hundreds of nodes instead of millions, giving logarithmic-ish search. Tunables: M (edges/node, recall vs memory) and efSearch (candidates explored, recall vs latency).</p>
+<p class="iq">What is recall@k and why accept less than 100%?</p>
+<p class="ia">Of the true k nearest neighbors, the fraction the index actually returns. 100% requires exact search, which is O(N) per query — too slow at scale. ANN trades a few percent recall for 10–100× speed; you tune efSearch/nprobe to hit a target like recall@10 ≥ 0.97 within your latency budget. The right recall target comes from measuring end-to-end answer quality, not from a default.</p>
+<p class="iq">Why can adding a metadata filter make vector search slower or less accurate?</p>
+<p class="ia">The ANN graph is built over all vectors regardless of metadata. With post-filtering, the search finds nearest neighbors then discards non-matches — so a selective filter can leave too few results, forcing more traversal or returning low recall. Solutions: pre-filtering / filterable indexes that restrict traversal to matching nodes, or partitioning by common filters. Key point: always benchmark recall WITH your real filters.</p>
+<p class="iq">When is pgvector enough, and when do you outgrow it?</p>
+<p class="ia">Enough when you're already on Postgres, under ~a few million vectors, and want SQL filtering + transactions in one system. You outgrow it when scale, high-QPS filtered search, or built-in hybrid/rerank pipelines demand a dedicated engine (Qdrant/Milvus). Don't add a vector DB reflexively — the extra system has real operational cost, and embedding quality matters more than engine choice for most quality gaps.</p>
+<p class="iq">How does product quantization let billions of vectors fit in memory?</p>
+<p class="ia">Split each vector into m sub-vectors; for each sub-space, learn a small codebook (e.g., 256 centroids) via k-means; replace each sub-vector with its nearest centroid's 1-byte id. A 1536-float vector (6 KB) becomes m bytes (e.g., 96 B) — ~60× smaller — so billion-scale indexes fit in RAM. Cost: approximate distances, lower recall, mitigated by re-ranking the PQ shortlist with exact distances (IVF-PQ + refine).</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>Exact NN = O(N·d)/query → dies at scale. ANN trades recall for speed; measure recall@k.<br>
+HNSW = layered proximity graph; greedy descend highways→streets; knobs M (edges) &amp; efSearch (candidates).<br>
+IVF = cluster + search nearest clusters (nprobe); PQ = compress vectors via codebooks (billion-scale in RAM).<br>
+Filtered search is a trap: know pre- vs post-filter; benchmark recall WITH filters.<br>
+pgvector until millions; dedicated engine beyond; embedding model &gt; DB for quality.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1603.09320">HNSW paper (Malkov &amp; Yashunin, 2016)</a></li>
+<li><a href="https://www.pinecone.io/learn/">Pinecone Learning Center</a> — the best free ANN/vector-search explainers</li>
+<li><a href="https://qdrant.tech/documentation/">Qdrant docs</a> · <a href="https://github.com/pgvector/pgvector">pgvector</a> · <a href="https://github.com/facebookresearch/faiss/wiki">FAISS wiki</a></li>
+<li><a href="https://huggingface.co/spaces/mteb/leaderboard">MTEB leaderboard</a> — pick your embedding model here</li>
+</ul>
+
+<div class="ch-nav">
+<a href="05-llm-engineering.html">← Ch 5: LLM engineering</a>
+<a href="07-rag-fundamentals.html">Chapter 7: RAG fundamentals →</a>
+</div>
+</main>
+</body>
+</html>

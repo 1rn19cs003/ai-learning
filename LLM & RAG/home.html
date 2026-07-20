@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM &amp; RAG — The Complete Track</title>
+<style>
+  :root { --accent: #C15F3C; --dark: #21201C; --grey: #6B6862; --light: #F4F3EE; --border: #D9D6CE; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: #FDFCF9; color: var(--dark); max-width: 1060px; margin: 0 auto; padding: 40px 24px 80px; line-height: 1.6; }
+  nav a { font-family: Arial, sans-serif; font-size: 13px; text-decoration: none; color: var(--accent); border: 1px solid var(--accent); border-radius: 16px; padding: 5px 14px; margin-right: 8px; }
+  nav a:hover { background: var(--accent); color: #fff; }
+  h1 { font-size: 40px; margin: 24px 0 6px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--grey); font-size: 18px; margin: 0 0 8px; }
+  .promise { background: var(--light); border-left: 4px solid var(--accent); padding: 14px 20px; border-radius: 0 10px 10px 0; margin: 24px 0 36px; }
+  h2 { font-size: 22px; margin-top: 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 18px; }
+  .ch { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; text-decoration: none; color: var(--dark); display: block; transition: box-shadow .15s, transform .15s; }
+  .ch:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.08); transform: translateY(-2px); }
+  .ch .n { font-family: Arial, sans-serif; font-size: 11px; letter-spacing: 1px; color: var(--accent); font-weight: bold; }
+  .ch h3 { margin: 6px 0 6px; font-size: 18px; }
+  .ch p { margin: 0; color: var(--grey); font-size: 14px; line-height: 1.5; }
+  .part-label { font-family: Arial, sans-serif; font-size: 12px; letter-spacing: 1.5px; color: var(--grey); text-transform: uppercase; margin: 34px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .extras { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .extras a { font-family: Arial, sans-serif; font-size: 13px; text-decoration: none; color: var(--accent); border: 1px solid var(--accent); border-radius: 16px; padding: 6px 16px; }
+  .extras a:hover { background: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+
+<nav><a href="../index.html">← All tracks</a></nav>
+
+<h1>LLM <span>&amp;</span> RAG</h1>
+<p class="subtitle">The complete track: how large language models work, and how to build retrieval systems around them — at the depth a MAANG interview demands.</p>
+
+<div class="promise">
+<b>The promise of this track:</b> finish all 12 chapters and their labs and you will be able to derive attention on a whiteboard, explain why your RAG pipeline failed and which stage caused it, implement a tool-calling agent from scratch, and defend every architectural decision with numbers. Every chapter has worked math, from-scratch TypeScript, corrected misconceptions, and interview questions with strong answers.
+</div>
+
+<div class="part-label">Part I — How LLMs actually work</div>
+<div class="grid">
+  <a class="ch" href="chapters/01-foundations.html"><span class="n">CHAPTER 01</span><h3>The math that runs everything</h3><p>Vectors, dot products, matrices, softmax, gradients, backprop — with a two-layer network trained by hand.</p></a>
+  <a class="ch" href="chapters/02-tokens-embeddings.html"><span class="n">CHAPTER 02</span><h3>Tokens &amp; embeddings</h3><p>BPE built step-by-step on a toy corpus, why token costs work the way they do, and the geometry of meaning.</p></a>
+  <a class="ch" href="chapters/03-transformer.html"><span class="n">CHAPTER 03</span><h3>The transformer, derived</h3><p>Attention computed by hand with real numbers, multi-head, RoPE, the residual stream, and KV-cache memory math.</p></a>
+  <a class="ch" href="chapters/04-training.html"><span class="n">CHAPTER 04</span><h3>How models are trained</h3><p>Pretraining, scaling laws, SFT, RLHF vs DPO, and LoRA with the parameter math that makes it 1000× cheaper.</p></a>
+</div>
+
+<div class="part-label">Part II — Using LLMs like an engineer</div>
+<div class="grid">
+  <a class="ch" href="chapters/05-llm-engineering.html"><span class="n">CHAPTER 05</span><h3>LLM engineering</h3><p>Sampling math, prompting that survives production, structured outputs, tool calling, streaming, cost budgets.</p></a>
+  <a class="ch" href="chapters/06-vector-search.html"><span class="n">CHAPTER 06</span><h3>Vector search internals</h3><p>HNSW walked layer by layer, IVF/PQ, the filtered-search trap, and when Postgres is all you need.</p></a>
+</div>
+
+<div class="part-label">Part III — RAG, naive to state of the art</div>
+<div class="grid">
+  <a class="ch" href="chapters/07-rag-fundamentals.html"><span class="n">CHAPTER 07</span><h3>RAG fundamentals</h3><p>The full pipeline in code, chunking with real numbers, and the failure taxonomy that drives everything after.</p></a>
+  <a class="ch" href="chapters/08-advanced-rag.html"><span class="n">CHAPTER 08</span><h3>Advanced RAG</h3><p>BM25 term by term, RRF worked example, cross-encoders, HyDE, contextual retrieval, Graph RAG, CRAG/Self-RAG.</p></a>
+</div>
+
+<div class="part-label">Part IV — Evals, agents, production</div>
+<div class="grid">
+  <a class="ch" href="chapters/09-evaluation.html"><span class="n">CHAPTER 09</span><h3>Evaluation</h3><p>The RAG triad, Ragas metrics with their formulas, LLM-judge pitfalls, golden sets, and evals as CI gates.</p></a>
+  <a class="ch" href="chapters/10-agents.html"><span class="n">CHAPTER 10</span><h3>Agents &amp; orchestration</h3><p>A ReAct agent in ~80 lines of real TypeScript, routing, critic loops, and when NOT to use agents.</p></a>
+  <a class="ch" href="chapters/11-production.html"><span class="n">CHAPTER 11</span><h3>Production engineering</h3><p>Prompt caching economics, model routing, semantic caching, prompt injection defense, monitoring with eval canaries.</p></a>
+  <a class="ch" href="chapters/12-reposage.html"><span class="n">CHAPTER 12</span><h3>RepoSage — the flagship build</h3><p>The full multi-agent codebase intelligence engine: components, contracts, build plan, and how to present it in interviews.</p></a>
+</div>
+
+<h2>Companion material</h2>
+<div class="extras">
+  <a href="notes/Handwritten_Notes.html">✎ Handwritten notes (plain-language version)</a>
+  <a href="curriculum/LLM_RAG_Curriculum.html">📋 Original syllabus &amp; resources</a>
+  <a href="diagrams/Diagrams.html">⬡ Diagrams</a>
+  <a href="labs/README.md">🧪 Code labs</a>
+  <a href="plan/LLM_RAG_Project_Plan.pdf">🗓 8-week plan</a>
+</div>
+
+</body>
+</html>

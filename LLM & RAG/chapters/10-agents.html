@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 10 · Agents &amp; orchestration — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html" class="current">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 10.</span> Agents &amp; multi-agent orchestration</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/10-agent</code> · Build one from scratch, no framework</p>
+
+<p>An agent is an LLM in a loop with tools and a goal, deciding its own next action each step. This chapter builds one in ~80 lines of real TypeScript so the "magic" dissolves, then covers routing and multi-agent patterns — and, just as importantly, when NOT to use agents, which is a more senior answer than knowing how to build them.</p>
+
+<h2 id="react">10.1 The ReAct loop</h2>
+<div class="def"><b>ReAct</b> (Reason + Act) interleaves thinking and tool use: the model <b>reasons</b> about what it needs, <b>acts</b> by calling a tool, <b>observes</b> the result, and repeats until it can answer. It's the tool-calling loop from Chapter 5 with a goal and a stopping condition.</div>
+
+<div class="diagram">
+<svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a10" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
+  <rect x="30" y="30" width="150" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="105" y="54" text-anchor="middle">THINK — "I need X"</text>
+  <rect x="270" y="30" width="150" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="345" y="54" text-anchor="middle">ACT — call a tool</text>
+  <rect x="510" y="30" width="160" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="590" y="54" text-anchor="middle">OBSERVE — read result</text>
+  <line x1="180" y1="50" x2="266" y2="50" stroke="#C15F3C" stroke-width="2" marker-end="url(#a10)"/>
+  <line x1="420" y1="50" x2="506" y2="50" stroke="#C15F3C" stroke-width="2" marker-end="url(#a10)"/>
+  <path d="M590,70 C590,110 105,110 105,72" stroke="#C15F3C" stroke-width="2" fill="none" marker-end="url(#a10)"/>
+  <text x="350" y="103" text-anchor="middle" fill="#C15F3C">loop until answer — or budget/step-limit hit</text>
+  <rect x="270" y="118" width="150" height="26" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="345" y="136" text-anchor="middle">final answer ✓</text>
+</svg>
+</div>
+
+<p class="code-label">A ReAct agent in ~40 lines (full version with tracing in the lab)</p>
+<pre><code><span class="kw">type</span> Tool = { name: <span class="kw">string</span>; description: <span class="kw">string</span>; run: (args: <span class="kw">any</span>) =&gt; <span class="fn">Promise</span>&lt;<span class="kw">string</span>&gt; };
+
+<span class="kw">async function</span> <span class="fn">runAgent</span>(goal: <span class="kw">string</span>, tools: Tool[], maxSteps = <span class="nu">6</span>): <span class="fn">Promise</span>&lt;<span class="kw">string</span>&gt; {
+  <span class="kw">const</span> messages = [{ role: <span class="st">"system"</span>, content: <span class="fn">systemPrompt</span>(tools) },
+                    { role: <span class="st">"user"</span>, content: goal }];
+  <span class="kw">for</span> (<span class="kw">let</span> step = <span class="nu">0</span>; step &lt; maxSteps; step++) {     <span class="cm">// THE BOUND — never an unbounded while(true)</span>
+    <span class="kw">const</span> reply = <span class="kw">await</span> <span class="fn">callModel</span>(messages, { tools });
+    <span class="kw">if</span> (reply.toolCall) {                          <span class="cm">// ACT</span>
+      <span class="kw">const</span> tool = tools.find(t =&gt; t.name === reply.toolCall.name);
+      <span class="kw">const</span> result = <span class="kw">await</span> tool!.run(reply.toolCall.args);   <span class="cm">// OBSERVE</span>
+      messages.push(reply, { role: <span class="st">"tool"</span>, content: result });
+    } <span class="kw">else</span> {
+      <span class="kw">return</span> reply.content;                        <span class="cm">// model decided it's done</span>
+    }
+  }
+  <span class="kw">return</span> <span class="st">"Stopped: step budget exhausted. Best-effort answer: "</span> + <span class="cm">/* summarize */</span> <span class="st">""</span>;
+}</code></pre>
+
+<p>That loop <b>is</b> an agent. Frameworks (LangGraph, the Vercel AI SDK's agent helpers) add state machines, persistence, retries, and parallelism — but you should build the raw loop once so you know exactly what they abstract, and can debug when they misbehave.</p>
+
+<h2 id="routing">10.2 Routing — the cheapest high-value pattern</h2>
+<p>A <b>router</b> classifies the incoming request and dispatches it: simple FAQ → cheap model, direct answer; code question → code-retrieval pipeline; math → calculator tool. Benefits: use an expensive model only when needed (big cost savings), and send each query to the pipeline built for it. RepoSage's router deciding "this needs the history agent + code agent" is exactly this. A router is often a single cheap classification call returning a JSON schema — high leverage, low complexity.</p>
+
+<h2 id="multiagent">10.3 Multi-agent patterns — and the hype warning</h2>
+<table>
+<tr><th>Pattern</th><th>Shape</th><th>Good for</th></tr>
+<tr><td>Orchestrator–workers</td><td>A manager decomposes the task, specialist agents do parts, manager combines</td><td>Tasks with separable subtasks (RepoSage: code/history/docs agents)</td></tr>
+<tr><td>Critic / reviewer</td><td>One agent drafts, a second grades and can demand a retry</td><td>Quality-critical output; catches hallucination (RepoSage's critic)</td></tr>
+<tr><td>Parallel + vote</td><td>Several agents attempt independently; aggregate/vote</td><td>Reducing variance on hard reasoning</td></tr>
+<tr><td>Sequential pipeline</td><td>Fixed stages, each an LLM step</td><td>Most "agentic" tasks that are actually workflows</td></tr>
+</table>
+
+<div class="misconception">"More agents = more capable system." — Usually false. Anthropic's own guidance ("Building Effective Agents") is blunt: most problems are best solved by a <b>workflow</b> (predetermined steps, LLM calls at each) rather than an <b>agent</b> (the model dynamically directs its own process). Every added agent multiplies cost, latency, and failure surface, and error compounds across steps (0.9 reliability over 5 dependent steps ≈ 0.59). Reach for autonomy only when the task genuinely can't be expressed as fixed steps. "I'd use the simplest thing that works, probably a workflow, and only add agency where the path is truly unpredictable" is the senior answer — it signals you've felt the pain of over-engineered agent systems.</div>
+
+<h2 id="reliability">10.4 Making agents reliable</h2>
+<ul>
+<li><b>Bound everything:</b> max steps, token budget, wall-clock timeout. Always have a terminal branch that answers honestly when the budget runs out.</li>
+<li><b>Handle tool failures:</b> tools error, time out, return junk. The agent must catch, possibly retry, and degrade gracefully — not crash or loop.</li>
+<li><b>Make it observable:</b> stream each think/act/observe step to a trace (and, for a portfolio piece, to the UI — visible reasoning is a huge demo win).</li>
+<li><b>Constrain the action space:</b> fewer, well-described tools beat many overlapping ones; the model chooses better and can be manipulated less (security — Chapter 11).</li>
+</ul>
+
+<div class="lab-link">🧪 <b>Lab 10:</b> <code>labs/10-agent/</code> — build the ReAct agent from scratch with three tools (your RAG pipeline, a calculator, web search), add a critic step that grades groundedness and triggers one bounded retry, stream the reasoning trace, then rebuild it in LangGraph.js and compare. <code>npm run lab10</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">What is an LLM agent, precisely?</p>
+<p class="ia">An LLM in a loop with tools and a goal, where the model decides each step whether to call a tool or finish — reason, act, observe, repeat (ReAct). The model never executes anything itself; your code runs the tools and feeds results back. Distinguish from a workflow, where the steps are fixed by you and the LLM just fills each step — agents choose their own path, which is more powerful and more failure-prone.</p>
+<p class="iq">When would you NOT use an agent?</p>
+<p class="ia">When the task decomposes into predictable steps — then a workflow is cheaper, faster, and more reliable. Agents add cost, latency, and compounding error (each dynamic step can go wrong and errors multiply), so reserve autonomy for genuinely unpredictable tasks where you can't pre-define the path. Anthropic's own guidance is to prefer workflows and add agency sparingly. Demonstrating restraint here reads as more senior than showing off a complex multi-agent build.</p>
+<p class="iq">How do you keep an agent from looping forever or blowing the budget?</p>
+<p class="ia">Hard bounds: max steps, token budget, wall-clock timeout, plus a terminal "answer with what I have / say I couldn't" branch. Catch and handle tool errors rather than retrying blindly. Constrain the tool set so the action space is small. And trace every step so you can see where a run went sideways. The loop must be <code>for (step &lt; max)</code>, never <code>while(true)</code>.</p>
+<p class="iq">Why does reliability degrade in multi-step agents, mathematically?</p>
+<p class="ia">Errors compound across dependent steps: if each step is 90% reliable and five must all succeed, end-to-end reliability is 0.9⁵ ≈ 0.59. That's why fewer steps, checkpoints/critics that catch errors mid-run, and workflows over open-ended agents all improve reliability — you're fighting a multiplicative decay. It's also why a critic/reviewer agent that can veto and retry is often worth its cost.</p>
+<p class="iq">What does a framework like LangGraph give you over a hand-rolled loop?</p>
+<p class="ia">Explicit state-machine structure (nodes/edges), persistence and resumability, built-in retries and parallelism, and streaming/observability hooks — useful once agents get complex or need durability. The trade-off is a learning curve and less transparency. I'd hand-roll the loop first to understand the mechanics, then adopt a framework when the state management and durability genuinely pay for themselves.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>Agent = LLM + tools + goal in a loop: THINK → ACT → OBSERVE → repeat (ReAct). Model requests, your code executes.<br>
+Loop must be bounded (max steps/tokens/time) + terminal honest branch.<br>
+Router = cheap classify + dispatch (huge value/cost). Patterns: orchestrator-workers, critic, vote, pipeline.<br>
+Workflow (fixed steps) &gt; agent (dynamic) for most tasks — errors compound (0.9⁵≈0.59). Add agency sparingly.<br>
+Reliability = bounds + tool-error handling + small action space + tracing.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2210.03629">ReAct paper (2022)</a> · <a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a> (essential; when NOT to)</li>
+<li><a href="https://langchain-ai.github.io/langgraphjs/">LangGraph.js</a> · <a href="https://sdk.vercel.ai/docs/foundations/agents">Vercel AI SDK — agents</a></li>
+</ul>
+
+<div class="ch-nav">
+<a href="09-evaluation.html">← Ch 9: Evaluation</a>
+<a href="11-production.html">Chapter 11: Production →</a>
+</div>
+</main>
+</body>
+</html>

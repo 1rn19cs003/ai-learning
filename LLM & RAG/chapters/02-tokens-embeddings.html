@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 2 · Tokens &amp; embeddings — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html" class="current">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 2.</span> Tokens &amp; embeddings: how text becomes numbers</h1>
+<p class="reading-meta">~35 min read · Lab: <code>labs/02-bpe</code> · Builds on: Ch 1 (vectors, dot products)</p>
+
+<p>Models cannot read. Before any intelligence happens, text must become integers (tokenization), and integers must become vectors (embedding). These two "boring preprocessing steps" explain LLM pricing, several famous failure modes, why context windows are measured the way they are, and — once we reach RAG — why retrieval works at all. Engineers who skip this chapter pay for it later, literally: token counting is the unit of every LLM invoice.</p>
+
+<h2 id="bpe">2.1 Byte-Pair Encoding, built by hand</h2>
+
+<div class="def"><b>BPE (Byte-Pair Encoding)</b> builds a vocabulary by starting from single characters (or bytes) and repeatedly merging the <b>most frequent adjacent pair</b> into a new token, for a fixed number of merges. The learned merge list IS the tokenizer.</div>
+
+<div class="worked">
+Corpus (with word frequencies): <code>low ×5, lower ×2, newest ×6, widest ×3</code>. Represent each word as characters + end marker <code>_</code>:<br>
+<code>l o w _</code> ×5 · <code>l o w e r _</code> ×2 · <code>n e w e s t _</code> ×6 · <code>w i d e s t _</code> ×3<br><br>
+<b>Count adjacent pairs:</b> (e,s) appears 6+3 = <b>9</b> (in newest, widest) — the winner. <b>Merge 1: e+s → es</b><br>
+Now <code>n e w es t _</code> ×6, <code>w i d es t _</code> ×3. Top pair: (es,t) = 9. <b>Merge 2: es+t → est</b><br>
+Then (est,_) = 9 → <b>Merge 3: est+_ → est_</b>. Then (l,o) = 5+2 = 7 → <b>Merge 4: l+o → lo</b>. Then (lo,w) = 7 → <b>Merge 5: lo+w → low</b>.<br><br>
+After 5 merges the vocabulary contains <code>est_</code>, <code>low</code> as single tokens. <b>"lowest"</b> — a word never seen in training — tokenizes to <code>low + est_</code>: two meaningful units. That is the entire genius of subword tokenization: <b>common patterns compress, rare words decompose, nothing is ever "unknown."</b>
+</div>
+
+<p>Production tokenizers (GPT-4's <code>o200k_base</code>, Llama's SentencePiece) are this exact algorithm run over terabytes with 100k–256k merges, operating on <b>bytes</b> rather than characters so that any UTF-8 string — emoji, Hindi, code — tokenizes without an unknown-token escape hatch.</p>
+
+<h3 id="consequences">Consequences you will meet in production</h3>
+<table>
+<tr><th>Fact</th><th>Consequence</th></tr>
+<tr><td>English averages ~4 characters/token; other languages often 2–3× more tokens for the same content</td><td>Non-English users pay more per sentence and exhaust context faster — a real product-fairness issue</td></tr>
+<tr><td>Models see tokens, not letters</td><td>"How many r's in strawberry" fails because <code>strawberry</code> may be 1–3 tokens, none of which expose letters. Counting, spelling, and rhyming are token-blind tasks</td></tr>
+<tr><td>Numbers tokenize inconsistently (<code>380</code> one token; <code>381</code> maybe two)</td><td>Arithmetic reliability varies with the literal digits involved — one reason tool-calling for math beats trusting the model</td></tr>
+<tr><td>Whitespace and casing produce different tokens (<code>hello</code> ≠ <code> hello</code> ≠ <code>Hello</code>)</td><td>Prompt-format changes silently change token counts and sometimes model behavior; cache keys must be exact</td></tr>
+<tr><td>Every API bills per token, in and out</td><td>Cost engineering starts with <code>countTokens()</code> — which is why RepoSage's first module is a token budgeter</td></tr>
+</table>
+
+<h2 id="embeddings">2.2 From token IDs to meaning: the embedding matrix</h2>
+
+<p>A token ID is just an index. The model's first layer is an <b>embedding matrix</b> E of shape <code>[vocab_size × d_model]</code> — for GPT-3: 50,257 × 12,288. Token 464 → row 464: a 12,288-dimensional vector. These rows are <b>learned parameters</b>, tuned by the same gradient descent as everything else, and they arrange themselves so that tokens used similarly end up geometrically close — because that arrangement reduces next-token-prediction loss.</p>
+
+<div class="intuition">The embedding matrix is a learned dictionary where definitions are <b>locations</b>. Nobody told the model "king relates to queen as man to woman" — but arranging royalty along one direction and gender along another was the arrangement that best predicted text, so gradient descent found it. The famous <code>king − man + woman ≈ queen</code> is real linear structure in trained embedding spaces (clearest in word2vec-era static embeddings).</div>
+
+<h3 id="static-contextual">Static vs. contextual — the upgrade that changed everything</h3>
+<table>
+<tr><th></th><th>Static (word2vec, 2013)</th><th>Contextual (transformers, 2018+)</th></tr>
+<tr><td>Vectors per word</td><td>Exactly one, forever</td><td>A new vector every time, computed from surrounding context</td></tr>
+<tr><td>"bank" in "river bank" vs "bank account"</td><td>Same vector — ambiguity unresolved</td><td>Different vectors — attention pulled in "river" vs "account"</td></tr>
+<tr><td>How obtained</td><td>Shallow prediction task (skip-gram: predict neighbors)</td><td>Full transformer forward pass; sentence embeddings pool the output</td></tr>
+<tr><td>Role today</td><td>Historical + intuition builder</td><td>Everything: the E matrix inside LLMs, and the sentence-embedding models powering RAG</td></tr>
+</table>
+
+<p>The embedding models you'll use for RAG (OpenAI <code>text-embedding-3</code>, Cohere embed, open-source <code>bge</code>/<code>e5</code>) are small transformers trained with <b>contrastive objectives</b>: pull (query, relevant passage) pairs together, push unrelated pairs apart. That training is why "money back" and "refund policy" land near each other — the property RAG's entire retrieval step depends on. Model quality is tracked on the <a href="https://huggingface.co/spaces/mteb/leaderboard">MTEB leaderboard</a>; dimension typically ranges 384–3072, and <b>Matryoshka-trained</b> models let you truncate vectors (3072 → 256) for cheaper storage with modest quality loss — an increasingly common cost lever.</p>
+
+<div class="misconception">"LLM token embeddings and RAG sentence embeddings are the same thing." — Related but distinct. The E matrix maps single tokens for the LLM's internal use. RAG uses separate <b>sentence-embedding models</b> whose entire output is one vector per passage, contrastively trained specifically so cosine similarity means "these texts are relevant to each other." Using an LLM's internal token embeddings for retrieval works badly; interviewers occasionally probe exactly this confusion.</div>
+
+<h3 id="code">BPE in 30 lines</h3>
+<p class="code-label">TypeScript — training loop only (full tokenizer with encode/decode in the lab)</p>
+<pre><code><span class="kw">function</span> <span class="fn">trainBPE</span>(words: Map&lt;<span class="kw">string</span>[], <span class="kw">number</span>&gt;, numMerges: <span class="kw">number</span>): [<span class="kw">string</span>, <span class="kw">string</span>][] {
+  <span class="kw">const</span> merges: [<span class="kw">string</span>, <span class="kw">string</span>][] = [];
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nu">0</span>; i &lt; numMerges; i++) {
+    <span class="kw">const</span> pairCounts = <span class="kw">new</span> <span class="fn">Map</span>&lt;<span class="kw">string</span>, <span class="kw">number</span>&gt;();
+    <span class="kw">for</span> (<span class="kw">const</span> [symbols, freq] <span class="kw">of</span> words)         <span class="cm">// count adjacent pairs, weighted by word frequency</span>
+      <span class="kw">for</span> (<span class="kw">let</span> j = <span class="nu">0</span>; j &lt; symbols.length - <span class="nu">1</span>; j++) {
+        <span class="kw">const</span> key = symbols[j] + <span class="st">" "</span> + symbols[j + <span class="nu">1</span>];
+        pairCounts.set(key, (pairCounts.get(key) ?? <span class="nu">0</span>) + freq);
+      }
+    <span class="kw">const</span> best = [...pairCounts.entries()].sort((a, b) =&gt; b[<span class="nu">1</span>] - a[<span class="nu">1</span>])[<span class="nu">0</span>];
+    <span class="kw">if</span> (!best) <span class="kw">break</span>;
+    <span class="kw">const</span> [a, b] = best[<span class="nu">0</span>].split(<span class="st">" "</span>);
+    merges.push([a, b]);
+    <span class="kw">for</span> (<span class="kw">const</span> [symbols] <span class="kw">of</span> words) {              <span class="cm">// apply the merge everywhere</span>
+      <span class="kw">for</span> (<span class="kw">let</span> j = <span class="nu">0</span>; j &lt; symbols.length - <span class="nu">1</span>; j++)
+        <span class="kw">if</span> (symbols[j] === a &amp;&amp; symbols[j + <span class="nu">1</span>] === b)
+          symbols.splice(j, <span class="nu">2</span>, a + b);
+    }
+  }
+  <span class="kw">return</span> merges;                                  <span class="cm">// the merge list IS the tokenizer</span>
+}</code></pre>
+
+<div class="lab-link">🧪 <b>Lab 02:</b> <code>labs/02-bpe/</code> — train BPE on real text, verify the merge order from the worked example, build encode/decode, and compare your token counts against tiktoken. <code>npm run lab02</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Why subword tokenization instead of word-level or character-level?</p>
+<p class="ia">Word-level: unbounded vocabulary, out-of-vocabulary failures, no sharing between "run/running/runner." Character-level: tiny vocabulary but sequences 4–5× longer — and attention cost grows quadratically with sequence length, so that's a compute disaster. Subword (BPE) is the compromise: frequent strings become single tokens (compression), rare words decompose into meaningful pieces (coverage), vocabulary stays fixed (~50–250k). Byte-level BPE additionally guarantees no input is ever unrepresentable.</p>
+<p class="iq">Why do LLMs fail at counting letters in a word?</p>
+<p class="ia">The model receives token IDs, not characters. "strawberry" arrives as one or a few opaque integers; the letters inside are not part of the representation. Character-level information exists only to the degree training data happened to spell words out. Correct fix in production: route such tasks to code execution, not to the model's intuition.</p>
+<p class="iq">Your prompt is identical but token counts differ across model providers. Why?</p>
+<p class="ia">Different tokenizers: different vocabularies, merge orders, and byte-handling. The same string can be 100 tokens in one and 130 in another — affecting cost, latency, and context fit. This is also why "token count" must be computed with the target model's own tokenizer, never estimated by characters/4 in anything billing-critical.</p>
+<p class="iq">How does an embedding model differ from an LLM if both are transformers?</p>
+<p class="ia">Objective and output. LLM: causal next-token prediction, outputs a distribution over the vocabulary, autoregressive. Embedding model: contrastive training on (query, passage) pairs, outputs one pooled vector, bidirectional attention (no causal mask — it can see the whole input). Same architecture family, completely different training targets and uses.</p>
+<p class="iq">When would you truncate embedding dimensions, and what's the trade-off?</p>
+<p class="ia">With Matryoshka-trained models, the first k dimensions carry most information, so truncating 3072→512 cuts vector storage and search cost ~6× with a small recall drop. Worth it when the corpus is millions of chunks and storage/latency dominate; not worth it for small corpora where quality is the bottleneck. Quantify with recall@k on your own eval set before committing.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>BPE: count adjacent pairs → merge most frequent → repeat k times; merge list = tokenizer; unseen words decompose (<code>lowest = low + est_</code>).<br>
+Bytes not chars → nothing unrepresentable. ~4 chars/token English; more elsewhere.<br>
+E matrix <code>[vocab × d]</code>: token ID → learned row vector; similar usage → nearby vectors.<br>
+Static = one vector/word (word2vec); contextual = computed per occurrence (transformers).<br>
+RAG embeddings: separate contrastively-trained models; cosine ≈ "relevant to each other."</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=zduSFxRajkE">Karpathy — Let's build the GPT Tokenizer</a> (2 hrs; byte-level BPE with all the gotchas)</li>
+<li><a href="https://arxiv.org/abs/1301.3781">word2vec paper (Mikolov 2013)</a> · <a href="https://jalammar.github.io/illustrated-word2vec/">Illustrated Word2vec</a></li>
+<li><a href="https://arxiv.org/abs/1908.10084">Sentence-BERT (2019)</a> — where practical sentence embeddings began</li>
+<li><a href="https://platform.openai.com/tokenizer">OpenAI tokenizer playground</a> — paste text, watch it split</li>
+</ul>
+
+<div class="ch-nav">
+<a href="01-foundations.html">← Ch 1: Math foundations</a>
+<a href="03-transformer.html">Chapter 3: The transformer, derived →</a>
+</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 3 · The transformer, derived — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html" class="current">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 3.</span> The transformer, derived</h1>
+<p class="reading-meta">~50 min read · Lab: <code>labs/03-attention</code> · The most important chapter in Part I</p>
+
+<p>In 2017, "Attention Is All You Need" replaced recurrence with a single idea: <b>let every token directly query every other token</b>. This chapter derives that mechanism with actual numbers you can verify by hand, then assembles the full architecture — multi-head attention, MLPs, residual streams, RoPE, the KV cache — and finishes with the memory math that explains why long context windows are expensive.</p>
+
+<h2 id="problem">3.1 The problem attention solves</h2>
+
+<p>"The animal didn't cross the street because <b>it</b> was too tired." What does <i>it</i> refer to? Every token's meaning depends on other tokens — sometimes far away. Pre-transformer models (RNNs/LSTMs) passed information left-to-right through a bottleneck of fixed size: by the time you reach "it", the memory of "animal" has been squeezed through many steps and partially lost. Worse, that sequential chain cannot be parallelized on GPUs. Attention fixes both at once: <b>direct pairwise access</b> (any token can look at any token in one step) and <b>full parallelism</b> (all pairs computed simultaneously as matrix multiplies).</p>
+
+<h2 id="qkv">3.2 Query, Key, Value — the retrieval metaphor made literal</h2>
+
+<div class="def">For each token vector x, three learned projections produce three vectors: <b>Q = W<sub>Q</sub>x</b> ("what am I looking for?"), <b>K = W<sub>K</sub>x</b> ("what can I be found by?"), <b>V = W<sub>V</sub>x</b> ("what do I contribute if selected?"). Attention scores are dot products between one token's Q and every token's K; the scores (after softmax) weight a sum of V's.</div>
+
+<div class="math">Attention(Q, K, V) = softmax( QKᵀ / √d<sub>k</sub> ) V</div>
+
+<div class="intuition">It is literally a soft database lookup: Q is the search query, K's are the index keys, V's are the stored payloads. Instead of returning the single best match, softmax returns a weighted blend of all matches. Foreshadowing: RAG (Chapter 7) is this same query-key-value pattern implemented <i>outside</i> the model with an actual database — recognizing that symmetry is a genuinely impressive interview moment.</div>
+
+<h3 id="worked">The complete computation, by hand</h3>
+
+<div class="worked">
+Three tokens, d<sub>k</sub> = 2 (absurdly small so we can verify everything). Suppose after projection:<br>
+Q₃ (for token 3, "it") = [1, 1] &nbsp;·&nbsp; K₁ = [1, 0], K₂ = [0, −1], K₃ = [1, 1] &nbsp;·&nbsp; V₁ = [2, 0], V₂ = [0, 2], V₃ = [1, 1]<br><br>
+<b>Step 1 — raw scores (Q₃ · Kᵢ):</b> s₁ = 1·1+1·0 = <b>1</b> · s₂ = 0−1 = <b>−1</b> · s₃ = 1+1 = <b>2</b><br>
+<b>Step 2 — scale by √d<sub>k</sub> = √2 ≈ 1.414:</b> [0.707, −0.707, 1.414]<br>
+<b>Step 3 — softmax:</b> e^0.707 = 2.028, e^−0.707 = 0.493, e^1.414 = 4.113 → sum = 6.634<br>
+weights = [<b>0.306</b>, <b>0.074</b>, <b>0.620</b>]<br>
+<b>Step 4 — weighted sum of values:</b> out = 0.306·[2,0] + 0.074·[0,2] + 0.620·[1,1] ≈ <b>[1.231, 0.769]</b> (using unrounded weights)<br><br>
+Token 3's new representation (weight 0.620 on token 3, 0.306 on token 1) is mostly its own value plus a substantial contribution from token 1 — "it" has absorbed information from "animal." Every attention layer in GPT-4 does exactly this, just with d<sub>k</sub>=128 and thousands of tokens.
+</div>
+
+<p><b>Why divide by √d<sub>k</sub>?</b> If Q and K components are independent with variance 1, their dot product has variance d<sub>k</sub> — scores grow with dimension. Large scores push softmax into its saturated region (winner-takes-all), where gradients vanish and training stalls. Dividing by √d<sub>k</sub> restores variance ≈ 1. It's a numerical-health trick with a one-line justification — know it cold; it is the single most asked transformer question.</p>
+
+<h3 id="causal">Causal masking — no peeking</h3>
+<p>For next-token prediction, token i may only attend to tokens ≤ i. Implementation: before softmax, set all "future" scores to −∞ (their softmax weight becomes exactly 0). This mask is why the same architecture can train on all positions of a sequence in parallel — each position predicts its next token using only its past — which is the training-efficiency miracle that made LLMs feasible.</p>
+
+<h2 id="multihead">3.3 Multi-head attention: parallel perspectives</h2>
+
+<p>One attention pattern per layer is too restrictive — "it" needs grammar relationships AND coreference AND semantic context. Solution: split d_model into h independent heads (GPT-3: 96 heads × 128 dims), each with its own W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, each computing attention in its own subspace; concatenate outputs, project back. Interpretability research (Anthropic's induction-head work) confirms heads specialize: some track syntax, some copy repeated patterns, some attend to positional neighbors. Compute cost is the same as one full-width head — the split is free diversity.</p>
+
+<h2 id="block">3.4 The full block: attention gathers, MLP thinks</h2>
+
+<div class="diagram">
+<svg viewBox="0 0 780 250" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
+  <rect x="20" y="100" width="90" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="65" y="120" text-anchor="middle">token</text><text x="65" y="136" text-anchor="middle">vector x</text>
+  <rect x="170" y="40" width="130" height="44" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="235" y="60" text-anchor="middle" font-weight="bold">LayerNorm →</text><text x="235" y="76" text-anchor="middle" font-weight="bold">Multi-head attention</text>
+  <circle cx="360" cy="122" r="14" fill="#fff" stroke="#8A867C"/><text x="360" y="127" text-anchor="middle" font-size="16">+</text>
+  <rect x="430" y="40" width="130" height="44" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="495" y="60" text-anchor="middle" font-weight="bold">LayerNorm →</text><text x="495" y="76" text-anchor="middle" font-weight="bold">MLP (4× wider)</text>
+  <circle cx="620" cy="122" r="14" fill="#fff" stroke="#8A867C"/><text x="620" y="127" text-anchor="middle" font-size="16">+</text>
+  <rect x="680" y="100" width="80" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="720" y="120" text-anchor="middle">to next</text><text x="720" y="136" text-anchor="middle">layer ×N</text>
+  <line x1="110" y1="122" x2="346" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <line x1="374" y1="122" x2="606" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <line x1="634" y1="122" x2="680" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <path d="M150,122 C150,62 165,62 170,62" stroke="#C15F3C" stroke-width="1.5" fill="none"/>
+  <path d="M300,62 C340,62 355,90 359,108" stroke="#C15F3C" stroke-width="1.5" fill="none" marker-end="url(#a3)"/>
+  <path d="M410,122 C410,62 425,62 430,62" stroke="#C15F3C" stroke-width="1.5" fill="none"/>
+  <path d="M560,62 C600,62 615,90 619,108" stroke="#C15F3C" stroke-width="1.5" fill="none" marker-end="url(#a3)"/>
+  <text x="390" y="180" text-anchor="middle" fill="#6B6862">the straight line is the RESIDUAL STREAM — layers ADD their contributions to it, never replace it</text>
+  <text x="390" y="200" text-anchor="middle" fill="#6B6862">attention mixes information ACROSS tokens · the MLP processes each token ALONE (≈ 2/3 of all parameters live here)</text>
+</svg>
+<div class="diagram-caption">One transformer block (pre-norm variant, as used by GPT-2 onward). A model is N of these stacked: GPT-3 has 96.</div>
+</div>
+
+<ul>
+<li><b>Residual stream:</b> each sublayer computes a delta and <b>adds</b> it: <code>x = x + Attn(LN(x))</code>, then <code>x = x + MLP(LN(x))</code>. Two payoffs: gradients flow backward through the identity path unimpeded (making 96-layer training possible), and conceptually the stream is a shared workspace each layer reads from and writes to.</li>
+<li><b>LayerNorm</b> re-centers and re-scales each vector — volume control preventing activations from drifting; modern models place it before each sublayer (pre-norm) for stability.</li>
+<li><b>The MLP</b> (d → 4d → d, with a GELU nonlinearity) is where per-token computation and most factual-knowledge storage happens — roughly two-thirds of total parameters. Attention gathers; the MLP digests.</li>
+</ul>
+
+<h2 id="rope">3.5 Position: why RoPE won</h2>
+
+<p>Attention is order-blind — "dog bites man" and "man bites dog" produce identical attention inputs without positional information. The original paper added sinusoidal position vectors to embeddings. Modern models use <b>RoPE (Rotary Position Embedding)</b>: instead of adding position, <b>rotate</b> each Q and K vector by an angle proportional to its position (pairs of dimensions rotate at different frequencies). The elegant consequence: the dot product between a rotated Q at position m and rotated K at position n depends only on the <b>offset m − n</b> — relative position falls out of the geometry automatically. Relative encoding generalizes better, and RoPE's frequency-based form is what context-extension tricks (YaRN, NTK scaling) manipulate to stretch trained models to longer windows.</p>
+
+<h2 id="kv">3.6 The KV cache — why generation is fast, and why long contexts cost memory</h2>
+
+<p>Generating token 501 requires attention over tokens 1–500 — but their K and V vectors haven't changed since we computed them. So we <b>cache</b> them. Each new token computes only its own Q, K, V, attends against the cache, appends. Generation cost per token becomes linear in context length instead of quadratic.</p>
+
+<div class="worked">
+<b>KV-cache memory for a Llama-2-7B-shaped model</b> (32 layers, 32 heads, head_dim 128, fp16 = 2 bytes):<br>
+Per token: 2 (K and V) × 32 layers × 32 heads × 128 dims × 2 bytes = <b>524,288 bytes ≈ 0.5 MB</b><br>
+At 4,096 context: ≈ <b>2.1 GB</b> — per sequence, on top of the 14 GB of weights.<br>
+At a hypothetical 128k context: ≈ <b>67 GB</b> — more than the weights themselves!<br><br>
+This single calculation explains: why long-context serving is expensive, why providers charge more for it, why <b>grouped-query attention</b> (multiple Q heads sharing one K/V head — Llama-2-70B uses 8 KV heads for 64 Q heads, an 8× cache reduction) exists, and why prompt caching (Chapter 11) is such a big cost lever. Interviewers love this calculation because it connects architecture to money.
+</div>
+
+<h3 id="code">Single-head causal attention in TypeScript</h3>
+<p class="code-label">The worked example, generalized (verify it reproduces [1.231, 0.769] in the lab)</p>
+<pre><code><span class="kw">function</span> <span class="fn">attention</span>(Q: <span class="kw">number</span>[][], K: <span class="kw">number</span>[][], V: <span class="kw">number</span>[][], causal = <span class="kw">true</span>): <span class="kw">number</span>[][] {
+  <span class="kw">const</span> dk = Q[<span class="nu">0</span>].length, scale = <span class="nu">1</span> / Math.sqrt(dk);
+  <span class="kw">return</span> Q.map((q, i) =&gt; {
+    <span class="kw">const</span> scores = K.map((k, j) =&gt;
+      causal &amp;&amp; j &gt; i ? -Infinity                       <span class="cm">// causal mask: no peeking at the future</span>
+      : q.reduce((s, qv, d) =&gt; s + qv * k[d], <span class="nu">0</span>) * scale);
+    <span class="kw">const</span> m = Math.max(...scores);                       <span class="cm">// numerically stable softmax (Ch 1!)</span>
+    <span class="kw">const</span> exps = scores.map(s =&gt; Math.exp(s - m));
+    <span class="kw">const</span> sum = exps.reduce((a, b) =&gt; a + b, <span class="nu">0</span>);
+    <span class="kw">const</span> w = exps.map(e =&gt; e / sum);                    <span class="cm">// attention weights for token i</span>
+    <span class="kw">return</span> V[<span class="nu">0</span>].map((_, d) =&gt;                            <span class="cm">// weighted sum of value vectors</span>
+      V.reduce((s, v, j) =&gt; s + w[j] * v[d], <span class="nu">0</span>));
+  });
+}</code></pre>
+
+<div class="lab-link">🧪 <b>Lab 03:</b> <code>labs/03-attention/</code> — implement this, verify against the hand-computed example, add multi-head splitting, and measure how output changes as you perturb one K vector. <code>npm run lab03</code>.</div>
+
+<div class="misconception">"The model 'reads' my prompt then 'writes' an answer as two different processes." — There is only one operation: predict the next token given everything so far, repeated. "Reading" is one parallel forward pass filling the KV cache (the prefill — this is the latency you feel before the first word appears); "writing" is the same computation done once per generated token against that cache (decode). Prefill is compute-bound, decode is memory-bandwidth-bound — that asymmetry drives most serving-infrastructure design.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Walk me through scaled dot-product attention. Why the scaling?</p>
+<p class="ia">Project each token to Q, K, V. Scores = QKᵀ: every query dotted with every key = pairwise relevance. Divide by √d<sub>k</sub>: dot products of d-dimensional unit-variance vectors have variance d, and large-magnitude scores saturate softmax → near-zero gradients → dead training. Softmax rows → weights → weighted sum of V. Output: each token re-expressed as a relevance-weighted mixture of what other tokens offer. (Then do the 3-token numeric example from this chapter on the whiteboard — few candidates can.)</p>
+<p class="iq">Why does attention cost O(n²), and what does the KV cache change?</p>
+<p class="ia">Every token attends to every other: n² score pairs per layer per head — that's prefill. The KV cache stores each token's K,V after computing them once, so each <i>generated</i> token costs O(n) against the cache instead of recomputing O(n²). Trade: memory. ~0.5 MB/token for a 7B model in fp16, so 128k context ≈ 67 GB — which is why GQA/MQA (sharing KV heads) and paged attention exist.</p>
+<p class="iq">Why did decoder-only architectures win over encoder-decoder?</p>
+<p class="ia">One stack, one objective (next-token), every token position provides training signal, natural streaming generation, and the causal mask lets one sequence train all positions in parallel. Encoder-decoder (T5-style) still shines for pure seq-to-seq like translation, but for general-purpose generation the simplicity and scaling behavior of decoder-only dominated. GPT/Llama/Claude are all decoder-only.</p>
+<p class="iq">What's actually stored in the MLP layers?</p>
+<p class="ia">Most of the parameters (~2/3) and, per interpretability research, much of the factual-association knowledge — attention routes information between positions, MLPs transform it per position. This is why "the model knows X" degrades gracefully: knowledge is distributed across many MLP weights, not stored in one place. It's also part of why fine-tuning facts in is unreliable versus RAG (Chapter 4 and 7).</p>
+<p class="iq">How does RoPE allow context extension after training?</p>
+<p class="ia">RoPE encodes relative position via rotation frequencies. Positions beyond training length produce rotation angles the model never saw — but because the encoding is a smooth function of position, you can rescale frequencies (NTK/YaRN interpolation) so unseen absolute positions map into the seen angular range, then lightly fine-tune. You're compressing "position space" rather than teaching new positions from scratch.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p><code>Attn(Q,K,V) = softmax(QKᵀ/√d)V</code> — derive it, don't recite it: scores → scale (variance) → mask (−∞ future) → softmax → blend V's.<br>
+Multi-head = same cost, h independent subspaces. Block: <code>x += Attn(LN(x)); x += MLP(LN(x))</code>. Residual stream = shared workspace + gradient highway.<br>
+MLP = 4× wide, ~2/3 of params, per-token "thinking" + fact storage.<br>
+RoPE: rotate Q,K by position; dot product depends on offset only.<br>
+KV cache: 2·layers·heads·d<sub>head</sub>·2B per token (~0.5 MB @7B) — memory buys speed; prefill compute-bound, decode bandwidth-bound.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need (2017)</a> — read AFTER this chapter; it will feel easy</li>
+<li><a href="https://jalammar.github.io/illustrated-transformer/">The Illustrated Transformer</a> — the classic visual companion</li>
+<li><a href="https://www.youtube.com/watch?v=kCc8FmEb1nY">Karpathy — Let's build GPT from scratch</a> — do this end-to-end; it's the best 2 hours in ML education</li>
+<li><a href="https://bbycroft.net/llm">bbycroft.net/llm</a> — 3D interactive walkthrough of a running GPT</li>
+<li><a href="https://arxiv.org/abs/2104.09864">RoFormer/RoPE (2021)</a> · <a href="https://transformer-circuits.pub/">Anthropic's Transformer Circuits</a> (what heads actually learn)</li>
+</ul>
+
+<div class="ch-nav">
+<a href="02-tokens-embeddings.html">← Ch 2: Tokens &amp; embeddings</a>
+<a href="04-training.html">Chapter 4: How models are trained →</a>
+</div>
+</main>
+</body>
+</html>

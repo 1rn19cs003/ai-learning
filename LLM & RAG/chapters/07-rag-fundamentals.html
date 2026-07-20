@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 7 · RAG fundamentals — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html" class="current">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 7.</span> RAG fundamentals</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/07-naive-rag</code> · Everything before this was preparation</p>
+
+<p>Retrieval-Augmented Generation is the "open-book exam" for LLMs: instead of hoping the model memorized your knowledge (it didn't — Chapter 4), you fetch the relevant passages at query time and put them in the prompt. This chapter builds a complete naive RAG pipeline in code, dissects chunking with real numbers, and — most importantly — teaches you to induce and categorize failures, because <b>the failure taxonomy you build here drives every advanced technique in Chapter 8.</b></p>
+
+<h2 id="loop">7.1 The core loop</h2>
+<div class="diagram">
+<svg viewBox="0 0 740 150" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a7" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
+  <rect x="8" y="45" width="118" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="67" y="65" text-anchor="middle" font-weight="bold">Question</text><text x="67" y="81" text-anchor="middle" fill="#6B6862">"how do refunds work?"</text>
+  <rect x="168" y="45" width="118" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="227" y="65" text-anchor="middle" font-weight="bold">Embed query</text><text x="227" y="81" text-anchor="middle" fill="#6B6862">→ vector</text>
+  <rect x="328" y="45" width="118" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="387" y="65" text-anchor="middle" font-weight="bold">Retrieve top-k</text><text x="387" y="81" text-anchor="middle" fill="#6B6862">ANN search</text>
+  <rect x="488" y="45" width="118" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="547" y="65" text-anchor="middle" font-weight="bold">Build prompt</text><text x="547" y="81" text-anchor="middle" fill="#6B6862">question + chunks</text>
+  <rect x="648" y="45" width="84" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="690" y="65" text-anchor="middle" font-weight="bold">Generate</text><text x="690" y="81" text-anchor="middle" fill="#6B6862">+ cite</text>
+  <line x1="126" y1="68" x2="164" y2="68" stroke="#C15F3C" stroke-width="2" marker-end="url(#a7)"/>
+  <line x1="286" y1="68" x2="324" y2="68" stroke="#C15F3C" stroke-width="2" marker-end="url(#a7)"/>
+  <line x1="446" y1="68" x2="484" y2="68" stroke="#C15F3C" stroke-width="2" marker-end="url(#a7)"/>
+  <line x1="606" y1="68" x2="644" y2="68" stroke="#C15F3C" stroke-width="2" marker-end="url(#a7)"/>
+  <text x="370" y="125" text-anchor="middle" fill="#6B6862">Offline first: load docs → chunk → embed → store in vector DB (the "book" the exam is open to)</text>
+</svg>
+</div>
+
+<p class="code-label">TypeScript — naive RAG end to end (uses the gateway from Ch 5)</p>
+<pre><code><span class="kw">async function</span> <span class="fn">answerWithRAG</span>(question: <span class="kw">string</span>): <span class="fn">Promise</span>&lt;Answer&gt; {
+  <span class="kw">const</span> qVec = <span class="kw">await</span> <span class="fn">embed</span>(question);                         <span class="cm">// same model used at index time!</span>
+  <span class="kw">const</span> chunks = <span class="kw">await</span> vectorDB.<span class="fn">search</span>(qVec, { topK: <span class="nu">5</span> });      <span class="cm">// nearest passages</span>
+  <span class="kw">const</span> context = chunks
+    .map((c, i) =&gt; <span class="st">`[${i + 1}] (${c.source}) ${c.text}`</span>)         <span class="cm">// number them so the model can cite</span>
+    .join(<span class="st">"\n\n"</span>);
+  <span class="kw">const</span> prompt = <span class="st">`Answer using ONLY the context. Cite sources as [n].
+If the answer is not in the context, say "I don't find this in the provided documents."
+
+&lt;context&gt;
+${context}
+&lt;/context&gt;
+
+Question: ${question}`</span>;
+  <span class="kw">const</span> text = <span class="kw">await</span> <span class="fn">generate</span>(prompt, { role: <span class="st">"synthesizer"</span>, temperature: <span class="nu">0</span> });
+  <span class="kw">return</span> { text, sources: chunks };                          <span class="cm">// always return provenance</span>
+}</code></pre>
+
+<p>Two non-negotiables already visible: the query must be embedded with the <b>same model</b> used for indexing (different models = incompatible vector spaces = garbage retrieval — a shockingly common bug), and the prompt must <b>instruct grounding and abstention</b> ("say you don't know") or the model will paper over retrieval gaps with confident fabrication.</p>
+
+<h2 id="why">7.2 Why RAG beats fine-tuning for knowledge (revisited concretely)</h2>
+<ul>
+<li><b>Freshness:</b> new document → re-index in seconds. Fine-tuning → hours/days and a new model artifact.</li>
+<li><b>Provenance:</b> RAG cites the exact source; users (and auditors) can verify. Weights cite nothing.</li>
+<li><b>Deletion / compliance:</b> delete a document from the index and it's gone. You cannot cleanly remove one fact from trained weights.</li>
+<li><b>Cost:</b> indexing is cheap; fine-tuning is not, and must be repeated as knowledge changes.</li>
+</ul>
+
+<h2 id="chunking">7.3 Chunking: the decision that quietly determines everything</h2>
+<div class="def"><b>Chunking</b> splits documents into passages that are embedded and retrieved as units. It is the highest-leverage, most-underrated knob in RAG: retrieval can only ever return a chunk, so if your chunk boundaries are wrong, no amount of clever search or prompting recovers.</div>
+
+<table>
+<tr><th>Strategy</th><th>How</th><th>Trade-off</th></tr>
+<tr><td>Fixed-size</td><td>Every N tokens</td><td>Simple; blindly splits sentences, tables, functions mid-thought</td></tr>
+<tr><td>Recursive character</td><td>Split on paragraphs, then sentences, to hit a target size</td><td>Good default; respects some structure</td></tr>
+<tr><td>Structure-aware</td><td>Split at markdown headings / code function boundaries (tree-sitter)</td><td>Best for docs &amp; code; each chunk is a coherent unit — this is what RepoSage uses</td></tr>
+<tr><td>Semantic</td><td>Split where embedding similarity between adjacent sentences drops</td><td>Adaptive; more compute at index time</td></tr>
+</table>
+
+<div class="worked">
+<b>The size trade-off, made concrete.</b> Say a target answer lives in a 3-sentence passage.<br>
+<b>Chunks too small (1 sentence):</b> the 3 sentences become 3 chunks; retrieving one gives the model a fragment without context ("It must be returned within 30 days" — <i>what</i> must?). Retrieval may rank them separately and miss some.<br>
+<b>Chunks too large (whole 5-page doc):</b> one chunk contains the answer plus 4.9 pages of noise; the embedding is an average of everything, so it's a weak match for a specific query, and you burn context tokens on irrelevance.<br>
+<b>Sweet spot (~300–500 tokens with 10–15% overlap):</b> the passage stays whole, the embedding is focused, overlap prevents an answer from being severed exactly at a boundary. Always tune on YOUR data with an eval set — there is no universal number.
+</div>
+
+<h2 id="failures">7.4 Why naive RAG fails — the taxonomy that drives Chapter 8</h2>
+<p>This is the heart of the chapter. Build naive RAG, then deliberately break it and <b>name each failure</b> — because each named failure maps to a specific fix in the next chapter.</p>
+<table>
+<tr><th>Failure</th><th>Symptom</th><th>Root cause</th><th>Ch 8 fix</th></tr>
+<tr><td>Vocabulary mismatch</td><td>User says "money back", docs say "refund"; keyword-only misses, vectors sometimes weak</td><td>Lexical gap; embeddings imperfect on rare terms/IDs</td><td>Hybrid search (BM25 + vectors)</td></tr>
+<tr><td>Chunk-boundary split</td><td>Answer spans two chunks; each half retrieves poorly</td><td>Chunking severed the answer</td><td>Better chunking + overlap; contextual retrieval</td></tr>
+<tr><td>Lost in the middle</td><td>Right chunk retrieved, but the model ignores it</td><td>Models attend to prompt start/end, snooze in the middle</td><td>Reranking + context ordering</td></tr>
+<tr><td>Low precision</td><td>Top-5 includes 3 irrelevant chunks; answer gets distracted</td><td>First-stage retrieval is recall-oriented, not precise</td><td>Cross-encoder reranking</td></tr>
+<tr><td>Ambiguous / vague query</td><td>"How does it work?" retrieves scattershot</td><td>Query too underspecified to embed well</td><td>Query rewriting / HyDE</td></tr>
+<tr><td>Multi-hop</td><td>"Which team owns the service that calls X?" fails</td><td>Needs 2+ chained lookups; naive RAG does 1</td><td>Query decomposition; Graph RAG</td></tr>
+<tr><td>Hallucination on gap</td><td>Nothing relevant retrieved, model invents an answer</td><td>No grounding/abstention discipline</td><td>Self-correction (CRAG) + eval gates (Ch 9)</td></tr>
+</table>
+
+<div class="intuition">Don't add advanced techniques because a blog said to. Add them because <b>you have a named failure they fix</b>. A senior engineer's RAG work is a diagnosis loop: measure a failure, identify its category, apply the targeted fix, re-measure. That discipline — not a longer tech stack — is what "production-grade RAG" actually means.</div>
+
+<div class="lab-link">🧪 <b>Lab 07:</b> <code>labs/07-naive-rag/</code> — build the pipeline over ~50 docs, then run a provided "break-it" question set and classify each failure into the taxonomy above. Output: a committed <code>failures.json</code> that seeds your Chapter 9 eval set. <code>npm run lab07</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Design a RAG system for a company's internal wiki. Walk me through it.</p>
+<p class="ia">Offline: load pages, chunk structure-aware (~400 tokens, small overlap), embed with a strong model, store in a vector DB with metadata (space, author, updated_at). Online: embed query, retrieve top-k, assemble a grounded prompt that demands citations and abstention, generate at temp 0, return sources. Then I'd immediately build an eval set from real failure questions and iterate — hybrid search and reranking only where the failure taxonomy justifies them. I'd call out freshness (re-index on edit), access control (filter by user permissions at retrieval — a security must), and evaluation as the parts most demos skip.</p>
+<p class="iq">Your RAG gives a wrong answer. How do you debug it?</p>
+<p class="ia">Localize the stage. Log the retrieved chunks: if the answer wasn't in them → retrieval failure (chunking? embedding? query?). If it WAS retrieved but the answer is still wrong → generation failure (lost-in-the-middle, weak grounding prompt, or too much distracting context). This retrieve-vs-generate split is the first cut; tracing every stage (Ch 9) makes it mechanical. "I'd look at the retrieved context first" is the answer they want — most people jump to blaming the model.</p>
+<p class="iq">How do you choose chunk size?</p>
+<p class="ia">Empirically, on your own eval set. Too small loses context and fragments answers; too large dilutes the embedding and wastes tokens. Start ~300–500 tokens with ~10–15% overlap and structure-aware boundaries (never split a function or table), then sweep sizes and measure retrieval precision/recall and final answer quality. There's no universal number — anyone who quotes one without "measure on your data" is guessing.</p>
+<p class="iq">When is RAG the wrong choice?</p>
+<p class="ia">When the task needs a behavior/skill/format rather than knowledge (fine-tune), when answers require reasoning over the ENTIRE corpus at once rather than a few passages (RAG retrieves a subset — consider summarization indexes or Graph RAG), or when the "knowledge" is small and static enough to fit in the prompt directly (just include it, skip the machinery). RAG shines for large, changing, citable knowledge bases.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>RAG = embed query → retrieve top-k → grounded prompt → generate + cite. Query &amp; index must share the embedding model.<br>
+RAG &gt; fine-tune for knowledge: fresh, cited, deletable, cheap.<br>
+Chunking is highest-leverage: structure-aware, ~300–500 tok, 10–15% overlap; retrieval can only return a chunk.<br>
+Failure taxonomy → fixes: vocab→hybrid, boundary→chunking/contextual, lost-middle→rerank/order, precision→cross-encoder, vague→rewrite/HyDE, multi-hop→decompose/graph, gap→abstain+CRAG.<br>
+Debug = retrieve-vs-generate split: check the retrieved chunks first.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://arxiv.org/abs/2005.11401">RAG paper (Lewis et al., 2020)</a> · <a href="https://arxiv.org/abs/2307.03172">Lost in the Middle (2023)</a></li>
+<li><a href="https://js.langchain.com/docs/tutorials/rag/">LangChain.js RAG tutorial</a> · <a href="https://ts.llamaindex.ai/">LlamaIndex.TS</a></li>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic — Contextual Retrieval</a> (preview of Ch 8's biggest simple win)</li>
+</ul>
+
+<div class="ch-nav">
+<a href="06-vector-search.html">← Ch 6: Vector search internals</a>
+<a href="08-advanced-rag.html">Chapter 8: Advanced RAG →</a>
+</div>
+</main>
+</body>
+</html>

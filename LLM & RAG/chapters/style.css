@@ -1,0 +1,93 @@
+/* Shared stylesheet for all chapters */
+:root {
+  --accent: #C15F3C; --accent-dark: #9A4A2E; --dark: #21201C; --grey: #6B6862;
+  --light: #F4F3EE; --border: #D9D6CE; --code-bg: #1E1E1E; --code-fg: #D4D4D4;
+  --blue: #1A5FA5; --green: #2E6B2E; --purple: #6B3FA0;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: Georgia, 'Times New Roman', serif; color: var(--dark);
+  margin: 0; padding: 0; line-height: 1.7; font-size: 16.5px; background: #FDFCF9;
+}
+/* layout */
+#sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: 260px;
+  background: var(--light); border-right: 1px solid var(--border);
+  padding: 22px 16px; overflow-y: auto; font-family: Arial, sans-serif; font-size: 13px;
+}
+#sidebar .sb-title { font-weight: bold; color: var(--accent); font-size: 14px; display: block; margin-bottom: 10px; }
+#sidebar a { display: block; color: var(--dark); text-decoration: none; padding: 5px 8px; border-radius: 5px; line-height: 1.35; }
+#sidebar a:hover { background: #E9E6DD; }
+#sidebar a.current { background: var(--accent); color: #fff; font-weight: bold; }
+#sidebar .sb-sep { border-top: 1px solid var(--border); margin: 10px 0; }
+#sidebar .sb-sec { font-size: 11px; letter-spacing: 1px; color: var(--grey); text-transform: uppercase; margin: 14px 0 4px 8px; }
+main { margin-left: 260px; padding: 40px 48px 100px; max-width: 860px; }
+@media (max-width: 900px) { #sidebar { display: none; } main { margin: 0 auto; padding: 24px 18px 80px; } }
+@media print { #sidebar { display: none; } main { margin: 0; } }
+
+/* typography */
+h1 { font-size: 34px; line-height: 1.2; margin: 8px 0 4px; }
+h1 .ch-num { color: var(--accent); }
+.reading-meta { color: var(--grey); font-size: 14px; font-family: Arial, sans-serif; margin-bottom: 28px; }
+h2 { font-size: 25px; margin-top: 52px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+h3 { font-size: 19.5px; margin-top: 34px; }
+a { color: var(--blue); }
+code { background: #EFEDE6; font-family: Consolas, 'Courier New', monospace; font-size: 14px; padding: 1px 5px; border-radius: 3px; }
+strong { color: #000; }
+
+/* code blocks */
+pre {
+  background: var(--code-bg); color: var(--code-fg); border-radius: 10px;
+  padding: 18px 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.55;
+  font-family: Consolas, 'Courier New', monospace;
+}
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+pre .cm { color: #6A9955; } /* comment */
+pre .kw { color: #569CD6; } /* keyword */
+pre .st { color: #CE9178; } /* string */
+pre .fn { color: #DCDCAA; } /* function */
+pre .nu { color: #B5CEA8; } /* number */
+.code-label { font-family: Arial, sans-serif; font-size: 12px; color: var(--grey); margin-bottom: -10px; margin-top: 16px; }
+
+/* callouts */
+.def { background: #EDF3FA; border-left: 4px solid var(--blue); border-radius: 0 8px 8px 0; padding: 12px 18px; margin: 18px 0; }
+.def::before { content: "DEFINITION"; display: block; font-family: Arial, sans-serif; font-size: 10.5px; letter-spacing: 1.5px; color: var(--blue); font-weight: bold; margin-bottom: 4px; }
+.intuition { background: #FFF6EC; border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 12px 18px; margin: 18px 0; }
+.intuition::before { content: "INTUITION"; display: block; font-family: Arial, sans-serif; font-size: 10.5px; letter-spacing: 1.5px; color: var(--accent); font-weight: bold; margin-bottom: 4px; }
+.misconception { background: #FBEEEE; border-left: 4px solid #B03030; border-radius: 0 8px 8px 0; padding: 12px 18px; margin: 18px 0; }
+.misconception::before { content: "COMMON MISCONCEPTION"; display: block; font-family: Arial, sans-serif; font-size: 10.5px; letter-spacing: 1.5px; color: #B03030; font-weight: bold; margin-bottom: 4px; }
+.worked { background: #F2F7F2; border: 1px solid #C5D9C5; border-radius: 10px; padding: 16px 20px; margin: 18px 0; }
+.worked::before { content: "WORKED EXAMPLE — follow with a pencil"; display: block; font-family: Arial, sans-serif; font-size: 10.5px; letter-spacing: 1.5px; color: var(--green); font-weight: bold; margin-bottom: 8px; }
+.math { text-align: center; font-size: 18px; font-style: italic; margin: 16px 0; color: #000; }
+
+/* interview section */
+.interview { background: #F5F0FA; border: 1px solid #D8C8EC; border-radius: 12px; padding: 20px 24px; margin: 24px 0; }
+.interview h3 { margin-top: 0; color: var(--purple); }
+.iq { font-weight: bold; margin: 18px 0 6px; color: var(--purple); }
+.iq::before { content: "Q · "; }
+.ia { margin: 0 0 6px; }
+.ia::before { content: "Strong answer: "; font-weight: bold; font-family: Arial, sans-serif; font-size: 13px; color: var(--grey); }
+
+/* whiteboard summary */
+.whiteboard { background: var(--dark); color: #F0EEE6; border-radius: 12px; padding: 20px 26px; margin: 26px 0; }
+.whiteboard h3 { margin-top: 0; color: #F0C87E; }
+.whiteboard code { background: #3A3934; color: #F0EEE6; }
+.whiteboard a { color: #9FC5E8; }
+
+/* tables */
+table { border-collapse: collapse; width: 100%; margin: 18px 0; font-size: 14.5px; }
+th, td { border: 1px solid var(--border); padding: 9px 13px; text-align: left; vertical-align: top; }
+th { background: var(--light); font-family: Arial, sans-serif; font-size: 13px; }
+tr:nth-child(even) td { background: #FAF8F3; }
+
+/* diagrams */
+.diagram { margin: 24px 0; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.diagram svg { max-width: 100%; height: auto; }
+.diagram-caption { font-family: Arial, sans-serif; font-size: 13px; color: var(--grey); margin-top: 8px; }
+
+/* nav footer */
+.ch-nav { display: flex; justify-content: space-between; margin-top: 60px; border-top: 1px solid var(--border); padding-top: 20px; font-family: Arial, sans-serif; font-size: 14px; }
+.ch-nav a { text-decoration: none; color: var(--accent); border: 1px solid var(--accent); border-radius: 20px; padding: 8px 18px; }
+.ch-nav a:hover { background: var(--accent); color: #fff; }
+.lab-link { background: #EDF3FA; border: 1px dashed var(--blue); border-radius: 10px; padding: 12px 18px; margin: 20px 0; font-family: Arial, sans-serif; font-size: 14px; }
+ul li, ol li { margin-bottom: 7px; }

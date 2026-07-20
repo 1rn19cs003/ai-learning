@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch 5 · LLM engineering — LLM &amp; RAG Track</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <span class="sb-title">LLM &amp; RAG Track</span>
+  <a href="../home.html">⌂ Track home</a>
+  <div class="sb-sep"></div>
+  <div class="sb-sec">Part I · Foundations</div>
+  <a href="01-foundations.html">01 · Math that runs everything</a>
+  <a href="02-tokens-embeddings.html">02 · Tokens &amp; embeddings</a>
+  <a href="03-transformer.html">03 · The transformer, derived</a>
+  <a href="04-training.html">04 · How models are trained</a>
+  <div class="sb-sec">Part II · Engineering</div>
+  <a href="05-llm-engineering.html" class="current">05 · LLM engineering</a>
+  <a href="06-vector-search.html">06 · Vector search internals</a>
+  <div class="sb-sec">Part III · RAG</div>
+  <a href="07-rag-fundamentals.html">07 · RAG fundamentals</a>
+  <a href="08-advanced-rag.html">08 · Advanced RAG</a>
+  <div class="sb-sec">Part IV · Ship it</div>
+  <a href="09-evaluation.html">09 · Evaluation</a>
+  <a href="10-agents.html">10 · Agents &amp; orchestration</a>
+  <a href="11-production.html">11 · Production</a>
+  <a href="12-reposage.html">12 · RepoSage project</a>
+  <div class="sb-sep"></div>
+  <a href="../notes/Handwritten_Notes.html">✎ Handwritten notes</a>
+  <a href="../labs/README.md">🧪 Labs</a>
+</nav>
+
+<main>
+<h1><span class="ch-num">Chapter 5.</span> LLM engineering: sampling, prompting, tools</h1>
+<p class="reading-meta">~40 min read · Lab: <code>labs/05-gateway</code> · Where theory becomes a product</p>
+
+<p>You now understand what happens inside the model. This chapter is about wrapping it in production-grade software: controlling generation (sampling), steering behavior (prompting), getting machine-parseable output (structured generation), giving the model hands (tool calling), and doing all of it reliably and cheaply. This is the day-to-day craft of an LLM engineer — and the RepoSage "LLM gateway" is built directly from it.</p>
+
+<h2 id="sampling">5.1 Sampling: turning a distribution into text</h2>
+
+<p>Recall from Chapter 1: the model outputs a probability distribution over the vocabulary. <b>Decoding</b> is how we pick a token from it, repeatedly.</p>
+
+<table>
+<tr><th>Strategy</th><th>How it picks</th><th>Use when</th></tr>
+<tr><td><b>Greedy</b> (temp 0)</td><td>Always the argmax token</td><td>Facts, code, extraction, anything needing determinism &amp; reproducibility</td></tr>
+<tr><td><b>Temperature</b></td><td>Divide logits by T before softmax (Ch 1 worked example): T&lt;1 sharpens, T&gt;1 flattens</td><td>Dial creativity; 0.7 is a common "natural but coherent" default</td></tr>
+<tr><td><b>Top-k</b></td><td>Keep only the k highest-prob tokens, renormalize, sample</td><td>Cap the tail so absurd tokens can't be chosen</td></tr>
+<tr><td><b>Top-p (nucleus)</b></td><td>Keep the smallest set of tokens whose cumulative prob ≥ p, sample</td><td>Adaptive tail-cutting; more principled than fixed k; p≈0.9 typical</td></tr>
+</table>
+
+<div class="misconception">"Temperature 0 makes the model deterministic." — Only <i>mostly</i>. Even at T=0, production APIs can vary run-to-run: floating-point non-associativity across GPU batch sizes, mixture-of-experts routing that depends on what else is in the batch, and load-balanced hardware differences. If you need reproducibility, set temperature 0 AND a seed (where supported) AND pin the model version — and still verify, don't assume. Interviewers who've shipped LLM systems love catching the "temp 0 = deterministic" oversimplification.</div>
+
+<h2 id="prompting">5.2 Prompting as engineering, not incantation</h2>
+
+<p>Prompting is unreliable when treated as magic phrases and reliable when treated as specification. The techniques that actually move metrics:</p>
+<ul>
+<li><b>Role separation:</b> system prompt = durable instructions/persona/constraints; user turns = the task. Keep instructions out of user data (also a security boundary — see prompt injection, Ch 11).</li>
+<li><b>Few-shot examples:</b> 2–5 worked <code>input→output</code> pairs. The strongest, most underused lever — the model pattern-matches your examples far more reliably than it follows prose instructions. Make examples cover edge cases you care about.</li>
+<li><b>Chain-of-thought:</b> "think step by step" (or a structured scratchpad) makes the model generate intermediate reasoning tokens before its answer. It measurably improves multi-step problems because the reasoning tokens become context the final answer attends to. For user-facing output, hide the scratchpad and show only the conclusion.</li>
+<li><b>Structured delimiting:</b> XML tags or clear headers (<code>&lt;context&gt;…&lt;/context&gt;</code>) so the model can tell instructions from data from examples. Reduces "the model followed something in my pasted document" failures.</li>
+<li><b>Explicit output contracts:</b> state the exact format, and give a negative instruction ("if the answer isn't in the context, say 'not found' — do not guess"). Grounding instructions like this are the backbone of faithful RAG.</li>
+</ul>
+
+<div class="intuition">A good prompt reads like a well-written ticket for a competent but very literal contractor: role, task, constraints, examples, and the exact deliverable format. If a smart human could misread it, the model will too — but the model won't ask a clarifying question, it'll just guess. Remove ambiguity, don't add magic words.</div>
+
+<h2 id="structured">5.3 Structured output: making LLMs programmable</h2>
+<p>A chatbot returns prose; a <i>system component</i> must return data your code can consume. Three mechanisms, increasing reliability:</p>
+<ol>
+<li><b>Ask for JSON in the prompt</b> — works often, fails silently sometimes (markdown fences, trailing commas, a chatty preamble). Never trust it alone.</li>
+<li><b>JSON mode</b> — the API guarantees syntactically valid JSON, but not necessarily <i>your</i> schema.</li>
+<li><b>Constrained decoding / tool schemas / structured outputs</b> — the API enforces a JSON Schema at the token level (it literally masks tokens that would violate the grammar). The gold standard: you get exactly the shape you declared.</li>
+</ol>
+<p>Regardless of mechanism, <b>always validate against your schema and retry on failure</b> — network hiccups and model drift happen. This validate-and-retry wrapper is a core piece of the gateway.</p>
+
+<h2 id="tools">5.4 Tool calling: the loop behind every agent</h2>
+
+<p>The model cannot execute anything. Tool calling is a protocol: you describe available functions (name, description, JSON-schema parameters); the model, instead of answering, emits a structured request "call <code>getWeather({city:'Delhi'})</code>"; <b>your</b> code runs it and returns the result; the model continues with that result in context. This request→execute→result loop, iterated, is the entire foundation of agents (Chapter 10).</p>
+
+<div class="diagram">
+<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
+  <defs><marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
+  <rect x="20" y="70" width="120" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="80" y="90" text-anchor="middle" font-weight="bold">Your code</text><text x="80" y="106" text-anchor="middle" fill="#6B6862">+ tool schemas</text>
+  <rect x="300" y="70" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="360" y="90" text-anchor="middle" font-weight="bold">Model</text><text x="360" y="106" text-anchor="middle" fill="#6B6862">decides</text>
+  <rect x="580" y="20" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="640" y="40" text-anchor="middle" font-weight="bold">Answer</text><text x="640" y="56" text-anchor="middle" fill="#6B6862">to user</text>
+  <rect x="580" y="118" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="640" y="138" text-anchor="middle" font-weight="bold">Tool runs</text><text x="640" y="154" text-anchor="middle" fill="#6B6862">in your code</text>
+  <line x1="140" y1="93" x2="296" y2="93" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="218" y="86" text-anchor="middle" fill="#6B6862">prompt + tools</text>
+  <line x1="420" y1="85" x2="576" y2="50" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="500" y="60" text-anchor="middle" fill="#6B6862">done</text>
+  <line x1="420" y1="100" x2="576" y2="135" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="500" y="128" text-anchor="middle" fill="#6B6862">needs a tool</text>
+  <path d="M640,118 C640,50 470,40 420,80" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#a5)"/>
+  <text x="470" y="176" text-anchor="middle" fill="#C15F3C">tool result goes back into context → model continues (loop)</text>
+</svg>
+</div>
+
+<h2 id="gateway">5.5 The LLM gateway — one door for every model call</h2>
+<p>In a real system, nothing calls the provider SDK directly. Everything goes through a <b>gateway</b> that centralizes the cross-cutting concerns: streaming, schema validation + retry, cost/token logging, timeouts, and a role→model map so you can swap models in one place. Here's the validate-and-retry heart of it:</p>
+
+<p class="code-label">TypeScript — structured generation with auto-retry (full gateway in the lab)</p>
+<pre><code><span class="kw">async function</span> <span class="fn">generateStructured</span>&lt;T&gt;(
+  prompt: <span class="kw">string</span>, schema: ZodSchema&lt;T&gt;, opts: { role: Role; maxRetries?: <span class="kw">number</span> }
+): <span class="fn">Promise</span>&lt;T&gt; {
+  <span class="kw">const</span> model = MODEL_FOR_ROLE[opts.role];         <span class="cm">// cheap model for router, strong for synthesis</span>
+  <span class="kw">let</span> lastErr: <span class="kw">unknown</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> attempt = <span class="nu">0</span>; attempt &lt;= (opts.maxRetries ?? <span class="nu">2</span>); attempt++) {
+    <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">callModel</span>(model, prompt, { responseFormat: <span class="st">"json"</span> });
+    logCost(model, res.usage);                       <span class="cm">// every call is metered — cost is a first-class metric</span>
+    <span class="kw">try</span> {
+      <span class="kw">return</span> schema.parse(JSON.parse(res.text));    <span class="cm">// throws if shape is wrong</span>
+    } <span class="kw">catch</span> (e) {
+      lastErr = e;
+      prompt += <span class="st">`\n\nYour previous reply failed validation: ${e}. Return ONLY valid JSON matching the schema.`</span>;
+    }                                                <span class="cm">// feed the error back — the model usually self-corrects</span>
+  }
+  <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="st">`Structured generation failed: ${lastErr}`</span>);
+}</code></pre>
+
+<div class="lab-link">🧪 <b>Lab 05:</b> <code>labs/05-gateway/</code> — build the gateway: streaming, this retry wrapper, a cost logger, a temperature/top-p playground, and one end-to-end tool call. It becomes the spine of every later lab. <code>npm run lab05</code>.</div>
+
+<div class="interview">
+<h3>Interview ammunition</h3>
+<p class="iq">Difference between temperature, top-k, and top-p?</p>
+<p class="ia">Temperature reshapes the whole distribution before sampling (divides logits — sharpen/flatten). Top-k truncates to the k most likely tokens then samples. Top-p (nucleus) truncates to the smallest set covering probability mass p — adaptive, so it keeps few tokens when the model is confident and more when it's uncertain. They compose: a common setting is temp 0.7 + top-p 0.9. For extraction/code, temp 0.</p>
+<p class="iq">How do you get reliable JSON out of an LLM?</p>
+<p class="ia">Prefer schema-constrained/structured-output APIs that enforce a JSON Schema during decoding — that's token-level guaranteed. Failing that, JSON mode for valid syntax. In all cases, validate against your schema in code and retry on failure, feeding the validation error back into the prompt so the model self-corrects. Never parse-and-pray on raw prose.</p>
+<p class="iq">Walk me through how tool calling works under the hood.</p>
+<p class="ia">You pass tool definitions (name, description, JSON-schema args) alongside the prompt. The model either answers or emits a structured tool-use request. It does NOT execute anything — your code parses the request, runs the function, and returns the result as a new message. The model continues with that result in context. Loop until it answers. Agents are just this loop with a goal and a stopping condition. Security note: the model chooses to call tools, so tool permissions must assume the model can be manipulated.</p>
+<p class="iq">Why centralize model access behind a gateway?</p>
+<p class="ia">One place for retries, timeouts, schema validation, cost/token logging, rate-limit handling, and model selection per role — so you can swap providers, add caching, or change the router model without touching call sites. It also makes cost observable (log every call's usage) and makes the system testable (mock one seam). Skipping it means these concerns get copy-pasted and drift.</p>
+<p class="iq">Few-shot vs. fine-tuning for a consistent output style — which first?</p>
+<p class="ia">Few-shot first: zero training cost, instant iteration, and often sufficient. Move to fine-tuning only when examples eat too much context/cost at scale, when you need the behavior without spending tokens on demonstrations every call, or when few-shot plateaus below your quality bar. Measure both on a held-out set before committing — fine-tuning is a bigger operational commitment.</p>
+</div>
+
+<div class="whiteboard">
+<h3>Whiteboard summary</h3>
+<p>Decoding: greedy (T0, deterministic-ish), temperature (logit divisor), top-k (fixed cut), top-p (adaptive mass cut) — they compose.<br>
+Prompting = specification: system/user split, few-shot (strongest lever), CoT, XML delimiting, explicit "say 'not found', don't guess".<br>
+Structured output: schema-constrained &gt; JSON mode &gt; prose; always validate + retry.<br>
+Tool calling: model REQUESTS, your code EXECUTES, result returns to context — this loop = agents.<br>
+Gateway centralizes streaming, retry, cost logging, role→model map.</p>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview">Anthropic — Prompt engineering</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview">Tool use docs</a></li>
+<li><a href="https://sdk.vercel.ai/docs">Vercel AI SDK</a> (TS streaming, tools, structured output) · <a href="https://arxiv.org/abs/2201.11903">Chain-of-Thought paper (2022)</a></li>
+<li><a href="https://ollama.com">Ollama</a> — run a local model to compare against frontier APIs</li>
+</ul>
+
+<div class="ch-nav">
+<a href="04-training.html">← Ch 4: How models are trained</a>
+<a href="06-vector-search.html">Chapter 6: Vector search internals →</a>
+</div>
+</main>
+</body>
+</html>
