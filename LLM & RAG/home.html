@@ -13,7 +13,11 @@
   h1 { font-size: 40px; margin: 24px 0 6px; }
   h1 span { color: var(--accent); }
   .subtitle { color: var(--grey); font-size: 18px; margin: 0 0 8px; }
-  .promise { background: var(--light); border-left: 4px solid var(--accent); padding: 14px 20px; border-radius: 0 10px 10px 0; margin: 24px 0 36px; }
+  .promise { background: var(--light); border-left: 4px solid var(--accent); padding: 14px 20px; border-radius: 0 10px 10px 0; margin: 24px 0 20px; }
+  .quickbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin: 0 0 36px; }
+  .qb-label { font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: var(--grey); }
+  .quickbar a { font-family: Arial, sans-serif; font-size: 13.5px; text-decoration: none; color: var(--accent); border: 1px solid var(--accent); border-radius: 16px; padding: 6px 14px; }
+  .quickbar a:hover { background: var(--accent); color: #fff; }
   h2 { font-size: 22px; margin-top: 40px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 18px; }
   .ch { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; text-decoration: none; color: var(--dark); display: block; transition: box-shadow .15s, transform .15s; }
@@ -36,6 +40,16 @@
 
 <div class="promise">
 <b>The promise of this track:</b> finish all 12 chapters and their labs and you will be able to derive attention on a whiteboard, explain why your RAG pipeline failed and which stage caused it, implement a tool-calling agent from scratch, and defend every architectural decision with numbers. Every chapter has worked math, from-scratch TypeScript, corrected misconceptions, and interview questions with strong answers.
+</div>
+
+<div class="quickbar">
+  <span class="qb-label">Jump to:</span>
+  <a href="chapters/01-foundations.html">▶ Start Chapter 1</a>
+  <a href="labs/README.md">🧪 Code labs</a>
+  <a href="notes/Handwritten_Notes.html">✎ Plain-language notes</a>
+  <a href="curriculum/LLM_RAG_Curriculum.html">📋 Original syllabus &amp; resource links</a>
+  <a href="diagrams/Diagrams.html">⬡ Diagrams</a>
+  <a href="plan/LLM_RAG_Project_Plan.pdf">🗓 8-week plan</a>
 </div>
 
 <div class="part-label">Part I — How LLMs actually work</div>
