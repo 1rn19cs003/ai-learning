@@ -49,6 +49,11 @@
 
 <p>Why lists of numbers? Because <b>similarity becomes geometry</b>. If "dog" and "puppy" are both points in a 1,536-dimensional space, and the training process pushed related concepts near each other, then "how similar are these words?" becomes "how close are these points?" — a question with an exact, fast, computable answer.</p>
 
+<div class="diagram">
+<img src="../assets/01-meaning-space.svg" alt="A 2D scatter plot: the words dog, puppy, cat, kitten cluster together in an 'animals' region while carburetor, engine, tire cluster far away in a 'car parts' region, showing that similar meanings sit close.">
+<div class="diagram-caption">Training arranges words so similar meanings sit close together. "How similar are two words?" becomes "how close are their points?" — the question the dot product answers.</div>
+</div>
+
 <h3 id="dot">The dot product — the single most executed operation in AI</h3>
 
 <div class="math">a · b = a₁b₁ + a₂b₂ + … + aₙbₙ</div>
@@ -61,6 +66,11 @@ a · b = (2)(1) + (1)(3) + (0)(0) = <b>5</b>.<br>
 |a| = √(4+1+0) = √5 ≈ 2.236 &nbsp;&nbsp; |b| = √(1+9+0) = √10 ≈ 3.162<br>
 cos θ = 5 / (2.236 × 3.162) = 5 / 7.071 ≈ <b>0.707</b> → θ = 45°.<br>
 The vectors are moderately aligned — and you just computed your first similarity score.
+</div>
+
+<div class="diagram">
+<img src="../assets/01-dot-product.svg" alt="Two vectors a=[2,1] and b=[1,3] drawn as arrows from the origin with a 45-degree angle marked between them, plus a legend showing cosine ≈ 1 for same direction, 0.71 for 45 degrees, 0 for perpendicular, and −1 for opposite.">
+<div class="diagram-caption">The dot product measures the angle between two arrows. Small angle = pointing the same way = similar meaning. Our a and b sit 45° apart, so cos θ ≈ 0.71.</div>
 </div>
 
 <h3 id="cosine">Cosine similarity — normalizing away magnitude</h3>
@@ -76,6 +86,11 @@ The vectors are moderately aligned — and you just computed your first similari
 <div class="def">A <b>matrix</b> is a grid of numbers. Multiplying a vector by a matrix produces a new vector: each output element is a dot product between the input and one <b>row</b> of the matrix. A matrix is therefore a bundle of learned "questions" — each row asks the input one dot-product question, and the output vector is the list of answers.</div>
 
 <p>This reframing matters enormously for the transformer chapter: when you see <code>Q = W_q · x</code>, read it as "the matrix W<sub>q</sub> asks the token vector x a battery of questions, producing its Query vector." A neural network layer is exactly <code>output = activation(W · input + b)</code> — one transformation, one nudge (bias), one nonlinearity.</p>
+
+<div class="diagram">
+<img src="../assets/01-matrix-transform.svg" alt="A blue unit square of four points on the left passes through a 'times matrix W (rotate + stretch)' box and becomes an orange parallelogram on the right, illustrating that a matrix moves every point in space at once.">
+<div class="diagram-caption">A matrix moves every point in space at once — here rotating and stretching the blue square into the orange parallelogram. Each output coordinate is a dot product of the input with one row of W. Stacking these transformations is what "deep" learning means.</div>
+</div>
 
 <div class="intuition">Think of a matrix as a machine that <b>moves every point in space simultaneously</b> — rotating, stretching, projecting. Deep learning = stacking many such machines and letting gradient descent tune what each one does. "Deep" just means "many transformations composed."</div>
 
@@ -93,6 +108,11 @@ Now apply <b>temperature T = 2</b> (divide logits by T before softmax): z/T = [1
 e¹=2.718, e^0.5=1.649, e⁰=1 → sum = 5.367 → P = <b>[0.506, 0.307, 0.186]</b><br>
 Same ranking, flatter distribution. And with T → 0: P → [1, 0, 0] — greedy.
 <b>That's all temperature is:</b> a divisor on logits that sharpens (T&lt;1) or flattens (T&gt;1) the distribution.
+</div>
+
+<div class="diagram">
+<img src="../assets/01-softmax.svg" alt="Three raw logit bars of heights 2.0, 1.0, 0.0 pass through a 'softmax' box and become three probability bars of 0.665, 0.245, 0.090 that sum to 1.">
+<div class="diagram-caption">Softmax squashes arbitrary scores into a valid probability distribution — all positive, summing to 1. The biggest logit gets the biggest slice; temperature (a divisor on the logits) makes the tall bar taller (T&lt;1) or evens the bars out (T&gt;1).</div>
 </div>
 
 <p>Two production-relevant details interviewers love:</p>

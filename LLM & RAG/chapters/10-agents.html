@@ -47,17 +47,7 @@
 <div class="def"><b>ReAct</b> (Reason + Act) interleaves thinking and tool use: the model <b>reasons</b> about what it needs, <b>acts</b> by calling a tool, <b>observes</b> the result, and repeats until it can answer. It's the tool-calling loop from Chapter 5 with a goal and a stopping condition.</div>
 
 <div class="diagram">
-<svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
-  <defs><marker id="a10" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
-  <rect x="30" y="30" width="150" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="105" y="54" text-anchor="middle">THINK — "I need X"</text>
-  <rect x="270" y="30" width="150" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="345" y="54" text-anchor="middle">ACT — call a tool</text>
-  <rect x="510" y="30" width="160" height="40" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="590" y="54" text-anchor="middle">OBSERVE — read result</text>
-  <line x1="180" y1="50" x2="266" y2="50" stroke="#C15F3C" stroke-width="2" marker-end="url(#a10)"/>
-  <line x1="420" y1="50" x2="506" y2="50" stroke="#C15F3C" stroke-width="2" marker-end="url(#a10)"/>
-  <path d="M590,70 C590,110 105,110 105,72" stroke="#C15F3C" stroke-width="2" fill="none" marker-end="url(#a10)"/>
-  <text x="350" y="103" text-anchor="middle" fill="#C15F3C">loop until answer — or budget/step-limit hit</text>
-  <rect x="270" y="118" width="150" height="26" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="345" y="136" text-anchor="middle">final answer ✓</text>
-</svg>
+<img src="../assets/10-react-loop.svg" alt="The ReAct loop: THINK ('I need X') then ACT (call a tool) then OBSERVE (read result), looping back to THINK until an answer is reached or the budget/step-limit is hit, ending in a final answer.">
 </div>
 
 <p class="code-label">A ReAct agent in ~40 lines (full version with tracing in the lab)</p>

@@ -84,18 +84,7 @@
 <p>The model cannot execute anything. Tool calling is a protocol: you describe available functions (name, description, JSON-schema parameters); the model, instead of answering, emits a structured request "call <code>getWeather({city:'Delhi'})</code>"; <b>your</b> code runs it and returns the result; the model continues with that result in context. This request→execute→result loop, iterated, is the entire foundation of agents (Chapter 10).</p>
 
 <div class="diagram">
-<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
-  <defs><marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
-  <rect x="20" y="70" width="120" height="46" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="80" y="90" text-anchor="middle" font-weight="bold">Your code</text><text x="80" y="106" text-anchor="middle" fill="#6B6862">+ tool schemas</text>
-  <rect x="300" y="70" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="360" y="90" text-anchor="middle" font-weight="bold">Model</text><text x="360" y="106" text-anchor="middle" fill="#6B6862">decides</text>
-  <rect x="580" y="20" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="640" y="40" text-anchor="middle" font-weight="bold">Answer</text><text x="640" y="56" text-anchor="middle" fill="#6B6862">to user</text>
-  <rect x="580" y="118" width="120" height="46" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="640" y="138" text-anchor="middle" font-weight="bold">Tool runs</text><text x="640" y="154" text-anchor="middle" fill="#6B6862">in your code</text>
-  <line x1="140" y1="93" x2="296" y2="93" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="218" y="86" text-anchor="middle" fill="#6B6862">prompt + tools</text>
-  <line x1="420" y1="85" x2="576" y2="50" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="500" y="60" text-anchor="middle" fill="#6B6862">done</text>
-  <line x1="420" y1="100" x2="576" y2="135" stroke="#8A867C" stroke-width="2" marker-end="url(#a5)"/><text x="500" y="128" text-anchor="middle" fill="#6B6862">needs a tool</text>
-  <path d="M640,118 C640,50 470,40 420,80" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#a5)"/>
-  <text x="470" y="176" text-anchor="middle" fill="#C15F3C">tool result goes back into context → model continues (loop)</text>
-</svg>
+<img src="../assets/05-tool-calling.svg" alt="Your code sends a prompt plus tool schemas to the model. The model either answers the user (done) or requests a tool; when it needs a tool, your code runs it and the result goes back into context so the model continues — a loop.">
 </div>
 
 <h2 id="gateway">5.5 The LLM gateway — one door for every model call</h2>

@@ -55,35 +55,7 @@
 
 <h2 id="architecture">12.2 Architecture</h2>
 <div class="diagram">
-<svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="11.5">
-  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
-  <text x="10" y="18" font-weight="bold" font-size="13">RepoSage — request path (top) over three indexes (bottom)</text>
-  <rect x="10" y="36" width="120" height="42" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="70" y="54" text-anchor="middle" font-weight="bold">React UI</text><text x="70" y="70" text-anchor="middle" fill="#6B6862">stream + traces</text>
-  <rect x="165" y="36" width="130" height="42" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="230" y="54" text-anchor="middle" font-weight="bold">Router agent</text><text x="230" y="70" text-anchor="middle" fill="#6B6862">intent → strategy</text>
-  <rect x="345" y="8" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="25" text-anchor="middle" font-weight="bold">Code agent</text><text x="415" y="39" text-anchor="middle" fill="#6B6862">AST · call graph</text>
-  <rect x="345" y="56" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="73" text-anchor="middle" font-weight="bold">History agent</text><text x="415" y="87" text-anchor="middle" fill="#6B6862">commits · blame</text>
-  <rect x="345" y="104" width="140" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="415" y="121" text-anchor="middle" font-weight="bold">Docs agent</text><text x="415" y="135" text-anchor="middle" fill="#6B6862">md · diagrams(vision)</text>
-  <rect x="525" y="56" width="120" height="38" rx="8" fill="#F4F3EE" stroke="#8A867C"/><text x="585" y="73" text-anchor="middle" font-weight="bold">Synthesizer</text><text x="585" y="87" text-anchor="middle" fill="#6B6862">fuse + cite</text>
-  <rect x="685" y="56" width="120" height="38" rx="8" fill="#F5E8DC" stroke="#C15F3C"/><text x="745" y="73" text-anchor="middle" font-weight="bold">Critic</text><text x="745" y="87" text-anchor="middle" fill="#6B6862">grade · retry</text>
-  <line x1="130" y1="57" x2="161" y2="57" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="295" y1="52" x2="341" y2="27" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="295" y1="57" x2="341" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="295" y1="63" x2="341" y2="123" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="485" y1="27" x2="523" y2="66" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="485" y1="75" x2="523" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="485" y1="123" x2="523" y2="84" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <line x1="645" y1="75" x2="683" y2="75" stroke="#8A867C" stroke-width="1.5" marker-end="url(#ar)"/>
-  <path d="M745,94 C745,165 230,165 230,80" stroke="#C15F3C" stroke-width="1.3" fill="none" stroke-dasharray="5,4" marker-end="url(#ar)"/>
-  <text x="500" y="182" text-anchor="middle" fill="#C15F3C">low groundedness → rewrite query, re-route, retry (bounded, ≤2)</text>
-  <rect x="10" y="210" width="795" height="80" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
-  <text x="407" y="232" text-anchor="middle" font-weight="bold">Three synchronized indexes — built offline, incremental on git push</text>
-  <text x="407" y="252" text-anchor="middle" fill="#6B6862">1 · Vector + BM25 over AST-aware code chunks &amp; contextualized doc chunks (tree-sitter, hybrid, rerank)</text>
-  <text x="407" y="270" text-anchor="middle" fill="#6B6862">2 · Knowledge graph: symbols/files/authors/commits with calls/imports/modified-by edges (Graph RAG)</text>
-  <text x="407" y="285" text-anchor="middle" fill="#6B6862">3 · Multimodal: architecture-diagram descriptions via a vision model</text>
-  <rect x="10" y="300" width="795" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
-  <text x="407" y="320" text-anchor="middle" font-weight="bold">Cross-cutting: LLM gateway (all model calls) · Eval harness (golden set, CI gates, tracing) · Prompt caching · Injection defense</text>
-  <text x="407" y="337" text-anchor="middle" fill="#6B6862">everything routes through the gateway; every change is gated by the golden eval set</text>
-</svg>
+<img src="../assets/12-reposage-arch.svg" alt="RepoSage architecture. Request path along the top: React UI to Router agent, which fans out to three retrieval specialists (Code agent, History agent, Docs agent), then to the Synthesizer, then the Critic; low groundedness loops back from the Critic to rewrite, re-route, and retry (bounded, at most 2). Bottom: three synchronized indexes built offline and incrementally on git push — vector plus BM25 over AST-aware code and contextualized docs, a knowledge graph of symbols/files/authors/commits, and multimodal diagram descriptions via a vision model. Cross-cutting: LLM gateway for all model calls, an eval harness with golden set and CI gates, prompt caching, and injection defense.">
 </div>
 
 <h2 id="components">12.3 Component contracts</h2>

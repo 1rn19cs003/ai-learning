@@ -44,20 +44,7 @@
 <p>A raw pretrained model is a brilliant autocomplete that will happily continue "What is the capital of France?" with "What is the capital of Germany?" — because it's completing a pattern of quiz questions, not answering you. Turning that into a helpful assistant takes three more stages. Understanding this pipeline tells you <b>what fine-tuning can and cannot fix</b> — the judgment that determines whether you reach for fine-tuning or RAG, the most consequential architecture decision in applied LLM work.</p>
 
 <div class="diagram">
-<svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="12">
-  <defs><marker id="a4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
-  <rect x="8" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
-  <text x="83" y="55" text-anchor="middle" font-weight="bold">Pretraining</text><text x="83" y="72" text-anchor="middle" fill="#6B6862">months · millions $</text><text x="83" y="87" text-anchor="middle" fill="#6B6862">→ knows everything</text>
-  <rect x="200" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
-  <text x="275" y="55" text-anchor="middle" font-weight="bold">SFT</text><text x="275" y="72" text-anchor="middle" fill="#6B6862">days · thousands of</text><text x="275" y="87" text-anchor="middle" fill="#6B6862">Q→A demos</text>
-  <rect x="392" y="35" width="150" height="58" rx="10" fill="#F4F3EE" stroke="#8A867C"/>
-  <text x="467" y="55" text-anchor="middle" font-weight="bold">RLHF / DPO</text><text x="467" y="72" text-anchor="middle" fill="#6B6862">preference pairs</text><text x="467" y="87" text-anchor="middle" fill="#6B6862">→ taste &amp; safety</text>
-  <rect x="584" y="35" width="168" height="58" rx="10" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
-  <text x="668" y="55" text-anchor="middle" font-weight="bold" fill="#C15F3C">Assistant</text><text x="668" y="72" text-anchor="middle" fill="#6B6862">the model you call</text><text x="668" y="87" text-anchor="middle" fill="#6B6862">via API</text>
-  <line x1="158" y1="64" x2="196" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
-  <line x1="350" y1="64" x2="388" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
-  <line x1="542" y1="64" x2="580" y2="64" stroke="#C15F3C" stroke-width="2" marker-end="url(#a4)"/>
-</svg>
+<img src="../assets/04-training-pipeline.svg" alt="Four stages left to right: Pretraining (months, millions of dollars, knows everything) → SFT (days, thousands of Q-to-A demos) → RLHF/DPO (preference pairs, taste and safety) → Assistant (the model you call via API).">
 </div>
 
 <h2 id="pretraining">4.1 Pretraining: compression as intelligence</h2>

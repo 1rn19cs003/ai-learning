@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif" font-size="12">
+  <text x="12" y="20" font-weight="bold">HNSW: coarse-to-fine descent</text>
+  <text x="12" y="52" fill="#6B6862">Layer 2 (highway)</text>
+  <circle cx="140" cy="46" r="7" fill="#C15F3C"/><circle cx="360" cy="46" r="7" fill="#F4F3EE" stroke="#8A867C"/><circle cx="560" cy="46" r="7" fill="#F4F3EE" stroke="#8A867C"/>
+  <line x1="140" y1="46" x2="360" y2="46" stroke="#8A867C"/><line x1="360" y1="46" x2="560" y2="46" stroke="#8A867C"/>
+  <text x="12" y="122" fill="#6B6862">Layer 1</text>
+  <circle cx="140" cy="116" r="6" fill="#C15F3C"/><circle cx="250" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="360" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="460" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/><circle cx="560" cy="116" r="6" fill="#F4F3EE" stroke="#8A867C"/>
+  <line x1="140" y1="116" x2="250" y2="116" stroke="#8A867C"/><line x1="250" y1="116" x2="360" y2="116" stroke="#8A867C"/><line x1="360" y1="116" x2="460" y2="116" stroke="#8A867C"/><line x1="460" y1="116" x2="560" y2="116" stroke="#8A867C"/>
+  <text x="12" y="196" fill="#6B6862">Layer 0 (everyone)</text>
+  <g fill="#F4F3EE" stroke="#8A867C"><circle cx="120" cy="190" r="5"/><circle cx="180" cy="190" r="5"/><circle cx="240" cy="190" r="5"/><circle cx="300" cy="190" r="5"/><circle cx="360" cy="190" r="5"/><circle cx="420" cy="190" r="5"/><circle cx="480" cy="190" r="5"/><circle cx="540" cy="190" r="5"/><circle cx="600" cy="190" r="5"/></g>
+  <circle cx="300" cy="190" r="6" fill="#2E6B2E"/>
+  <line x1="120" y1="190" x2="600" y2="190" stroke="#8A867C"/>
+  <path d="M140,53 C140,80 140,95 140,110" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <path d="M140,122 C180,150 250,175 296,186" stroke="#C15F3C" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <text x="640" y="190" fill="#2E6B2E" font-weight="bold">found</text>
+  <text x="360" y="228" text-anchor="middle" fill="#6B6862">Enter at top → few big hops → descend → local refine. Visits ~hundreds of nodes, not millions.</text>
+</svg>

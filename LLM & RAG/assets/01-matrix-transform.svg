@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif" font-size="12">
+  <defs><marker id="m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C15F3C"/></marker></defs>
+  <text x="120" y="30" text-anchor="middle" fill="#6B6862">before — input points</text>
+  <line x1="50" y1="220" x2="230" y2="220" stroke="#D9D6CE"/><line x1="50" y1="220" x2="50" y2="60" stroke="#D9D6CE"/>
+  <rect x="90" y="140" width="80" height="80" fill="#EDF3FA" stroke="#1A5FA5" stroke-width="2"/>
+  <circle cx="90" cy="220" r="4" fill="#1A5FA5"/><circle cx="170" cy="220" r="4" fill="#1A5FA5"/>
+  <circle cx="90" cy="140" r="4" fill="#1A5FA5"/><circle cx="170" cy="140" r="4" fill="#1A5FA5"/>
+  <rect x="290" y="120" width="130" height="56" rx="10" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="355" y="143" text-anchor="middle" fill="#C15F3C" font-weight="bold">× matrix W</text>
+  <text x="355" y="162" text-anchor="middle" fill="#6B6862">rotate + stretch</text>
+  <line x1="240" y1="148" x2="288" y2="148" stroke="#C15F3C" stroke-width="2" marker-end="url(#m)"/>
+  <line x1="422" y1="148" x2="470" y2="148" stroke="#C15F3C" stroke-width="2" marker-end="url(#m)"/>
+  <text x="590" y="30" text-anchor="middle" fill="#6B6862">after — every point moved</text>
+  <line x1="490" y1="220" x2="700" y2="220" stroke="#D9D6CE"/><line x1="490" y1="220" x2="490" y2="60" stroke="#D9D6CE"/>
+  <polygon points="530,220 640,220 690,120 580,120" fill="#FBEEE9" stroke="#C15F3C" stroke-width="2"/>
+  <circle cx="530" cy="220" r="4" fill="#C15F3C"/><circle cx="640" cy="220" r="4" fill="#C15F3C"/>
+  <circle cx="580" cy="120" r="4" fill="#C15F3C"/><circle cx="690" cy="120" r="4" fill="#C15F3C"/>
+</svg>

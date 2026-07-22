@@ -83,6 +83,7 @@ tr:nth-child(even) td { background: #FAF8F3; }
 /* diagrams */
 .diagram { margin: 24px 0; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
 .diagram svg { max-width: 100%; height: auto; }
+.diagram img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 .diagram-caption { font-family: Arial, sans-serif; font-size: 13px; color: var(--grey); margin-top: 8px; }
 
 /* nav footer */

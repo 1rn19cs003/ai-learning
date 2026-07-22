@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 780 250" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif" font-size="12">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8A867C"/></marker></defs>
+  <rect x="20" y="100" width="90" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="65" y="120" text-anchor="middle">token</text><text x="65" y="136" text-anchor="middle">vector x</text>
+  <rect x="170" y="40" width="130" height="44" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="235" y="60" text-anchor="middle" font-weight="bold">LayerNorm →</text><text x="235" y="76" text-anchor="middle" font-weight="bold">Multi-head attention</text>
+  <circle cx="360" cy="122" r="14" fill="#fff" stroke="#8A867C"/><text x="360" y="127" text-anchor="middle" font-size="16">+</text>
+  <rect x="430" y="40" width="130" height="44" rx="8" fill="#F5E8DC" stroke="#C15F3C" stroke-width="1.5"/>
+  <text x="495" y="60" text-anchor="middle" font-weight="bold">LayerNorm →</text><text x="495" y="76" text-anchor="middle" font-weight="bold">MLP (4× wider)</text>
+  <circle cx="620" cy="122" r="14" fill="#fff" stroke="#8A867C"/><text x="620" y="127" text-anchor="middle" font-size="16">+</text>
+  <rect x="680" y="100" width="80" height="44" rx="8" fill="#F4F3EE" stroke="#8A867C"/>
+  <text x="720" y="120" text-anchor="middle">to next</text><text x="720" y="136" text-anchor="middle">layer ×N</text>
+  <line x1="110" y1="122" x2="346" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <line x1="374" y1="122" x2="606" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <line x1="634" y1="122" x2="680" y2="122" stroke="#8A867C" stroke-width="2" marker-end="url(#a3)"/>
+  <path d="M150,122 C150,62 165,62 170,62" stroke="#C15F3C" stroke-width="1.5" fill="none"/>
+  <path d="M300,62 C340,62 355,90 359,108" stroke="#C15F3C" stroke-width="1.5" fill="none" marker-end="url(#a3)"/>
+  <path d="M410,122 C410,62 425,62 430,62" stroke="#C15F3C" stroke-width="1.5" fill="none"/>
+  <path d="M560,62 C600,62 615,90 619,108" stroke="#C15F3C" stroke-width="1.5" fill="none" marker-end="url(#a3)"/>
+  <text x="390" y="180" text-anchor="middle" fill="#6B6862">the straight line is the RESIDUAL STREAM — layers ADD their contributions to it, never replace it</text>
+  <text x="390" y="200" text-anchor="middle" fill="#6B6862">attention mixes information ACROSS tokens · the MLP processes each token ALONE (≈ 2/3 of all parameters live here)</text>
+</svg>
